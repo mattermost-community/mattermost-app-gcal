@@ -3,7 +3,9 @@ package main
 import (
 	"net/http"
 
+	pluginapi "github.com/mattermost/mattermost-plugin-api"
 	"github.com/mattermost/mattermost-plugin-apps/apps"
+	"github.com/mattermost/mattermost-plugin-apps/utils"
 	"github.com/mattermost/mattermost-server/v6/plugin"
 
 	root "github.com/mattermost/mattermost-app-gcal"
@@ -17,7 +19,10 @@ type Plugin struct {
 
 func (p *Plugin) OnActivate() error {
 	root.InitHTTP(apps.PluginAppPath)
-	function.InitHTTP(apps.PluginAppPath)
+
+	function.Log = utils.NewPluginLogger(pluginapi.NewClient(p.API, p.Driver))
+	function.AppPathPrefix = apps.PluginAppPath
+	function.Init()
 	return nil
 }
 

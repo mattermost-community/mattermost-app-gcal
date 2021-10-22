@@ -6,8 +6,10 @@
     "homepage_url": "https://github.com/mattermost/mattermost-app-gcal",
     "requested_permissions": [
         "act_as_admin",
+        "act_as_bot",
         "act_as_user",
-        "remote_oauth2"
+        "remote_oauth2",
+        "remote_webhooks"
     ],
     "requested_locations": [
         "/command"
@@ -26,13 +28,20 @@
         "plugin_id": "com.mattermost.app.gcal"
     },
     "aws_lambda": {
-		"functions": [
-			{
-				"path": "/",
-				"name": "gcal",
-				"handler": "main",
-				"runtime": "go1.x"
-			}
-		]
-	}
+        "functions": [
+            {
+                "path": "/",
+                "name": "gcal",
+                "handler": "main",
+                "runtime": "go1.x"
+            }
+        ]
+    },
+    "remote_webhook_auth_type": "none",
+    "on_remote_webhook": {
+        "path": "/webhook",
+        "expand": {
+            "oauth2_app": "all"
+        }
+    }
 }

@@ -5,116 +5,126 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"path"
 
+	"go.uber.org/zap/zapcore"
 	"golang.org/x/oauth2"
 
 	"github.com/mattermost/mattermost-plugin-apps/apps"
+	appspath "github.com/mattermost/mattermost-plugin-apps/apps/path"
 	"github.com/mattermost/mattermost-plugin-apps/utils"
 	"github.com/mattermost/mattermost-plugin-apps/utils/httputils"
 )
 
 const IconPath = "icon.png"
 
+var AppPathPrefix = ""
+var Log = utils.MustMakeCommandLogger(zapcore.DebugLevel)
+
 type CallRequest struct {
 	apps.CallRequest
 
 	ts  oauth2.TokenSource
 	ctx context.Context
+	log utils.Logger
 }
 
-func InitHTTP(prefix string) {
+func Init() {
 	// Ping
-	http.HandleFunc(prefix+"/ping",
-		httputils.HandleData("text/plain", []byte("{}")))
+	http.HandleFunc(AppPathPrefix+"/ping",
+		httputils.HandleJSONData([]byte("{}")))
 
 	// Bindings
-	HandleCall(prefix, "/bindings", handler(bindings))
+	HandleCall("/bindings", bindings)
 
 	// OAuth2 (Google Calendar) connect commands and callbacks.
-	HandleCall(prefix, "/oauth2/connect", handler(oauth2Connect))
-	HandleCall(prefix, "/oauth2/complete", handler(oauth2Complete))
+	HandleCall("/oauth2/connect", oauth2Connect)
+	HandleCall("/oauth2/complete", oauth2Complete)
+
+	// Google Calendar webhook handler
+	HandleCall(appspath.Webhook, webhookReceived)
 
 	// Commands
-	HandleCommands(prefix, allCommands...)
+	HandleSimpleCommand(configure)
+	HandleSimpleCommand(connect)
+	HandleSimpleCommand(disconnect)
+	HandleSimpleCommand(debug)
+	HandleSimpleCommand(subscribe)
+
+	// Modals
+	HandleCall("/configure-modal/submit",
+		RequireAdmin(handleConfigureModal))
+
+	// Lookups
+	HandleCall(subscribe.Path+"/lookup",
+		RequireGoogleToken(LookupHandler(lookupSubscribeCalendar)))
+
+	http.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
+		Log.Warnw("not found", "path", req.URL.Path, "method", req.Method)
+		http.Error(w, fmt.Sprintf("Not found: %s %q", req.Method, req.URL.Path), http.StatusNotFound)
+	})
+
 }
 
-type Handler interface {
-	Handle(CallRequest) apps.CallResponse
+type HandlerFunc func(CallRequest) apps.CallResponse
+
+func FormHandler(h func(CallRequest) apps.Form) HandlerFunc {
+	return func(creq CallRequest) apps.CallResponse {
+		f := h(creq)
+		return apps.NewFormResponse(f)
+	}
 }
 
-type handler func(CallRequest) apps.CallResponse
-
-func (h handler) Handle(creq CallRequest) apps.CallResponse {
-	return h(creq)
+func LookupHandler(h func(CallRequest) []apps.SelectOption) HandlerFunc {
+	return func(creq CallRequest) apps.CallResponse {
+		opts := h(creq)
+		return apps.NewLookupResponse(opts)
+	}
 }
 
-func HandleCall(prefix, p string, h Handler) {
-	http.HandleFunc(prefix+p, func(w http.ResponseWriter, req *http.Request) {
-		doHandleCall(w, req, h, nil)
+func HandleCall(p string, h HandlerFunc) {
+	http.HandleFunc(AppPathPrefix+p, func(w http.ResponseWriter, req *http.Request) {
+		doHandleCall(w, req, h)
 	})
 }
 
-func HandleCommands(prefix string, commands ...CommandHandler) {
-	for i := range commands {
-		command := commands[i]
-		meta := command.Metadata()
-		http.HandleFunc(prefix+meta.Path+"/form",
-			func(w http.ResponseWriter, req *http.Request) {
-				h := func(creq CallRequest) apps.CallResponse {
-					form := command.Form(creq)
-					return apps.NewFormResponse(form)
-				}
-				doHandleCall(w, req, handler(h), &meta)
-			})
+func HandleSimpleCommand(command SimpleCommand) {
+	HandleCall(command.Submit.Path+"/submit", command.Handler)
+}
 
-		http.HandleFunc(prefix+meta.Path+"/submit",
-			func(w http.ResponseWriter, req *http.Request) {
-				doHandleCall(w, req, command, &meta)
-			})
+func RequireAdmin(h HandlerFunc) HandlerFunc {
+	return func(creq CallRequest) apps.CallResponse {
+		if creq.Context.AdminAccessToken == "" {
+			return apps.NewErrorResponse(
+				utils.NewUnauthorizedError("missing admin access token, required to invoke " + creq.Path))
+		}
+		return h(creq)
 	}
 }
 
-func doHandleCall(w http.ResponseWriter, req *http.Request, h Handler, meta *Meta) {
+func doHandleCall(w http.ResponseWriter, req *http.Request, h HandlerFunc) {
 	creq := CallRequest{}
 	creq.ctx = context.Background()
+	creq.log = Log.With("path", creq.Path)
 	err := json.NewDecoder(req.Body).Decode(&creq)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
 	}
 
-	if meta != nil {
-		if meta.RequireAdmin && creq.Context.AdminAccessToken == "" {
-			http.Error(w, "missing admin access token, required to invoke "+creq.Path, http.StatusUnauthorized)
-		}
-
-		if meta.RequireGoogleToken {
-			if creq.Context.OAuth2.User == "" {
-				http.Error(w, "missing google token, required to invoke "+creq.Path, http.StatusUnauthorized)
-			}
-			oauthConfig := oauth2Config(creq)
-			token := oauth2.Token{}
-			remarshal(&token, creq.Context.OAuth2.User)
-			fmt.Printf("<>/<> %s: doHandleCall: creq.OAuth2: %s", creq.Path, utils.Pretty(creq.Context.OAuth2))
-			fmt.Printf("<>/<> %s: doHandleCall: token: %s", creq.Path, utils.Pretty(token))
-
-			creq.ts = oauthConfig.TokenSource(creq.ctx, &token)
-
-			// // Store new token if refreshed
-			// newToken, err := tokenSource.Token()
-			// if err != nil && newToken.AccessToken != token.AccessToken {
-			// 	_ = appclient.AsActingUser(creq.Context).StoreOAuth2User(creq.Context.AppID, newToken)
-			// }
-		}
+	cresp := h(creq)
+	if cresp.Type == apps.CallResponseTypeError {
+		creq.log.WithError(cresp).Debugw("Call failed.")
 	}
-
-	_ = httputils.WriteJSON(w, h.Handle(creq))
-
-	// if creq.Context.OAuth2.User != nil {
-	// 	RefreshOAuth2Token(creq)
-	// }
+	_ = httputils.WriteJSON(w, cresp)
 }
 
 func remarshal(dst, src interface{}) {
 	data, _ := json.Marshal(src)
 	json.Unmarshal(data, dst)
+}
+
+func (creq CallRequest) appProxyURL(paths ...string) string {
+	p := path.Join(append([]string{creq.Context.AppPath}, paths...)...)
+	return creq.Context.MattermostSiteURL + p
 }

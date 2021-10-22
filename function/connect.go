@@ -1,8 +1,6 @@
 package function
 
 import (
-	"fmt"
-
 	"github.com/pkg/errors"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
@@ -12,58 +10,55 @@ import (
 	"github.com/mattermost/mattermost-plugin-apps/utils"
 )
 
+var OAuth2Scopes = []string{
+	"https://www.googleapis.com/auth/calendar",
+	"https://www.googleapis.com/auth/userinfo.profile",
+	"https://www.googleapis.com/auth/userinfo.email",
+}
+
+
 func oauth2Config(creq CallRequest) *oauth2.Config {
-	fmt.Printf("<>/<> %s: getOAuth2Config: %s", creq.Path, utils.Pretty(creq.Context.OAuth2))
 	return &oauth2.Config{
 		ClientID:     creq.Context.OAuth2.ClientID,
 		ClientSecret: creq.Context.OAuth2.ClientSecret,
 		Endpoint:     google.Endpoint,
 		RedirectURL:  creq.Context.OAuth2.CompleteURL,
-		Scopes: []string{
-			"https://www.googleapis.com/auth/calendar",
-			"https://www.googleapis.com/auth/userinfo.profile",
-			"https://www.googleapis.com/auth/userinfo.email",
-		},
+		Scopes:       OAuth2Scopes,
 	}
 }
 
-var connect = command{
-	Meta: Meta{
-		Name: "connect",
-	},
-
-	call: apps.Call{
+var connect = SimpleCommand{
+	Name: "connect",
+	Submit: apps.Call{
 		Expand: &apps.Expand{
 			OAuth2App: apps.ExpandAll,
 		},
 	},
 
-	handler: func(creq CallRequest) apps.CallResponse {
-		fmt.Printf("<>/<> %s: handler: context: %s", creq.Path, utils.Pretty(creq.Context))
+	Handler: func(creq CallRequest) apps.CallResponse {
 		return apps.NewTextResponse("[Connect](%s) to Google.", creq.Context.OAuth2.ConnectURL)
 	},
-}
+}.Init()
 
-var disconnect = command{
-	Meta: Meta{
-		Name: "disconnect",
-	},
+var disconnect = SimpleCommand{
+	Name: "disconnect",
 
-	call: apps.Call{
+	Submit: apps.Call{
 		Expand: &apps.Expand{
 			ActingUserAccessToken: apps.ExpandAll,
+			OAuth2User:            apps.ExpandAll,
 		},
 	},
 
-	handler: func(creq CallRequest) apps.CallResponse {
+	Handler: RequireGoogleToken(func(creq CallRequest) apps.CallResponse {
 		asActingUser := appclient.AsActingUser(creq.Context)
 		err := asActingUser.StoreOAuth2User(creq.Context.AppID, nil)
 		if err != nil {
 			return apps.NewErrorResponse(errors.Wrap(err, "failed to reset the stored user"))
 		}
 		return apps.NewTextResponse("Disconnected your Google account.")
-	},
-}
+	}),
+}.Init()
 
 func oauth2Connect(creq CallRequest) apps.CallResponse {
 	state, _ := creq.Values["state"].(string)
@@ -73,7 +68,9 @@ func oauth2Connect(creq CallRequest) apps.CallResponse {
 
 func oauth2Complete(creq CallRequest) apps.CallResponse {
 	code, _ := creq.Values["code"].(string)
-	token, err := oauth2Config(creq).Exchange(creq.ctx, code)
+	oauth2Config := oauth2Config(creq)
+
+	token, err := oauth2Config.Exchange(creq.ctx, code)
 	if err != nil {
 		return apps.NewErrorResponse(errors.Wrap(err, "failed token exchange"))
 	}
@@ -85,22 +82,29 @@ func oauth2Complete(creq CallRequest) apps.CallResponse {
 	return apps.NewTextResponse("completed connecting to Google Calendar with OAuth2.")
 }
 
-// func RefreshOAuth2Token(creq CallRequest) oauth2.TokenSource {
-// 	oauthConfig := oauth2Config(creq)
-// 	token := oauth2.Token{}
-// 	remarshal(&token, creq.Context.OAuth2.User)
-// 	tokenSource := oauthConfig.TokenSource(creq.ctx, &token)
-
-// 	// Store new token if refreshed
-// 	newToken, err := tokenSource.Token()
-// 	if err != nil && newToken.AccessToken != token.AccessToken {
-// 		_ = StoreOAuth2User(creq, newToken)
-// 	}
-
-// 	return tokenSource
-// }
-
 func StoreOAuth2User(creq CallRequest, token *oauth2.Token) error {
 	asActingUser := appclient.AsActingUser(creq.Context)
 	return asActingUser.StoreOAuth2User(creq.Context.AppID, token)
+}
+
+func RequireGoogleToken(h HandlerFunc) HandlerFunc {
+	return func(creq CallRequest) apps.CallResponse {
+		if creq.Context.OAuth2.User == "" {
+			return apps.NewErrorResponse(
+				utils.NewUnauthorizedError("missing google token, required to invoke " + creq.Path))
+		}
+		oauthConfig := oauth2Config(creq)
+		token := oauth2.Token{}
+		remarshal(&token, creq.Context.OAuth2.User)
+
+		creq.ts = oauthConfig.TokenSource(creq.ctx, &token)
+
+		// Store new token if refreshed
+		newToken, err := creq.ts.Token()
+		if err == nil && newToken.AccessToken != token.AccessToken {
+			_ = appclient.AsActingUser(creq.Context).StoreOAuth2User(creq.Context.AppID, newToken)
+		}
+
+		return h(creq)
+	}
 }

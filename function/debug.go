@@ -11,18 +11,22 @@ import (
 	"github.com/pkg/errors"
 )
 
-var debug = command{
-	Meta: Meta{
-		Name:               "debug",
-		RequireGoogleToken: true,
-		Description:        "Test Google Cal",
+var debug = SimpleCommand{
+	Name:        "debug",
+	Description: "Test Google Cal",
+
+	Submit: apps.Call{
+		Expand: &apps.Expand{
+			OAuth2User: apps.ExpandAll,
+			OAuth2App:  apps.ExpandAll,
+		},
 	},
 
-	form: apps.Form{
+	Form: apps.Form{
 		Title: "Test Google Cal",
 	},
 
-	handler: func(creq CallRequest) apps.CallResponse {
+	Handler: RequireGoogleToken(func(creq CallRequest) apps.CallResponse {
 		oauth2Service, err := oauth2api.NewService(creq.ctx, option.WithTokenSource(creq.ts))
 		if err != nil {
 			return apps.NewErrorResponse(errors.Wrap(err, "failed to get OAuth2 connection to Google"))
@@ -54,5 +58,5 @@ var debug = command{
 		}
 
 		return apps.NewTextResponse(message)
-	},
-}
+	}),
+}.Init()

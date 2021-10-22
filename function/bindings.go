@@ -5,50 +5,30 @@ import (
 	"golang.org/x/oauth2"
 )
 
-var adminCommands = []CommandHandler{
-	configure,
-}
-var connectedCommands = []CommandHandler{
-	debug,
-	disconnect,
-}
-var disconnectedCommands = []CommandHandler{
-	connect,
-}
-
-var allCommands []CommandHandler
-
-func init() {
-	allCommands = append(allCommands, adminCommands...)
-	allCommands = append(allCommands, connectedCommands...)
-	allCommands = append(allCommands, disconnectedCommands...)
-}
-
 func bindings(creq CallRequest) apps.CallResponse {
+
 	bindings := apps.Binding{
 		Icon:        IconPath,
 		Label:       "gcal",
 		Description: "Google Calendar Mattermost App",
 	}
 
-	fromCommands := func(commands []CommandHandler) []apps.Binding {
-		bindings := []apps.Binding{}
-		for _, c := range commands {
-			bindings = append(bindings, c.Binding(creq))
-		}
-		return bindings
-	}
-
 	token := oauth2.Token{}
 	remarshal(&token, creq.Context.OAuth2.User)
 	if token.AccessToken == "" {
-		bindings.Bindings = append(bindings.Bindings, fromCommands(disconnectedCommands)...)
+		bindings.Bindings = append(bindings.Bindings,
+			connect.Binding)
 	} else {
-		bindings.Bindings = append(bindings.Bindings, fromCommands(connectedCommands)...)
+		bindings.Bindings = append(bindings.Bindings,
+			debug.Binding,
+			subscribe.Binding,
+			disconnect.Binding,
+		)
 	}
 
 	if creq.Context.ActingUser.IsSystemAdmin() {
-		bindings.Bindings = append(bindings.Bindings, fromCommands(adminCommands)...)
+		bindings.Bindings = append(bindings.Bindings,
+			configure.Binding)
 	}
 
 	return apps.NewDataResponse([]apps.Binding{

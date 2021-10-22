@@ -10,6 +10,6 @@ import (
 )
 
 func main() {
-	function.InitHTTP("")
+	function.Init()
 	lambda.Start(httpadapter.New(http.DefaultServeMux).Proxy)
 }

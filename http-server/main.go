@@ -10,7 +10,9 @@ import (
 
 func main() {
 	root.InitHTTP("")
-	function.InitHTTP("")
+
+	function.AppPathPrefix = ""
+	function.Init()
 
 	fmt.Println("gcal App started, manifest at http://localhost:4444/manifest.json")
 	panic(http.ListenAndServe(":4444", nil))

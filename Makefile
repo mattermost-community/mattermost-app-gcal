@@ -4,6 +4,14 @@ MANIFEST_FILE ?= plugin.json
 GOPATH ?= $(shell go env GOPATH)
 GO_TEST_FLAGS ?= -race
 GO_BUILD_FLAGS ?=
+BUILD_DATE = $(shell date -u)
+BUILD_HASH = $(shell git rev-parse HEAD)
+BUILD_HASH_SHORT = $(shell git rev-parse --short HEAD)
+LDFLAGS += -X "github.com/mattermost/mattermost-app-gcal/function.BuildDate=$(BUILD_DATE)"
+LDFLAGS += -X "github.com/mattermost/mattermost-app-gcal/function.BuildHash=$(BUILD_HASH)"
+LDFLAGS += -X "github.com/mattermost/mattermost-app-gcal/function.BuildHashShort=$(BUILD_HASH_SHORT)"
+GO_BUILD_FLAGS += -ldflags '$(LDFLAGS)'
+GO_TEST_FLAGS += -ldflags '$(LDFLAGS)'
 
 export GO111MODULE=on
 
@@ -57,7 +65,7 @@ run:
 dist-aws: 
 	rm -rf dist/aws && mkdir -p dist/aws
 	cd aws ; \
-	 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o ../dist/aws/main . 
+	 	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build $(GO_BUILD_FLAGS) -o ../dist/aws/main . 
 	cp manifest.json dist/aws
 	cp -r static dist/aws
 	cd dist/aws ; \

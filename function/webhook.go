@@ -42,27 +42,25 @@ func webhookReceived(creq CallRequest) apps.CallResponse {
 			"header X-Goog-Resource-Id not found in the Google webhook request"))
 	}
 
-	creq.log.Debugf("<>/<> WEBHOOK 4: context: %s", utils.Pretty(creq.Context))
+	sa := ServiceAccountFromRequest(creq)
+	creq.log.Debugf("<>/<> WEBHOOK 4: sa: %s", utils.Pretty(sa))
 
-	data, _ := creq.Context.OAuth2.Data.(string)
-	if data == "" {
+	var authOpt option.ClientOption
+	switch sa.Mode {
+	case fAccountJSON:
+		authOpt = option.WithCredentialsJSON([]byte(sa.AccountJSON))
+	case fAPIKey:
+		authOpt = option.WithAPIKey(sa.APIKey)
+	default:
 		return apps.NewErrorResponse(errors.New(
-			"no service account data to process Google webhook request, use `/gcal configure` to update"))
+			"no service account available to process Google webhook request, use `/gcal configure` to update"))
 	}
-	// conf, err := google.JWTConfigFromJSON([]byte(data), OAuth2Scopes...)
-	// if err != nil {
-	// 	return apps.NewErrorResponse(err)
-	// }
-	// creq.log.Debugf("<>/<> WEBHOOK 5: got service account conf")
 
-	calService, err := calendar.NewService(creq.ctx,
-		option.WithCredentialsJSON([]byte(data)),
-		option.WithScopes(OAuth2Scopes...),
-	)
+	calService, err := calendar.NewService(creq.ctx, authOpt, option.WithScopes(OAuth2Scopes...))
 	if err != nil {
 		return apps.NewErrorResponse(errors.Wrap(err, "failed to get Calendar client to Google"))
 	}
-	creq.log.Debugf("<>/<> WEBHOOK 6: got client")
+	creq.log.Debugf("<>/<> WEBHOOK 6: got an %q client", sa.Mode)
 
 	events, err := calService.Events.List(calID).Do()
 	if err != nil {

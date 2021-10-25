@@ -29,6 +29,8 @@ func bindings(creq CallRequest) apps.CallResponse {
 	if creq.Context.ActingUser.IsSystemAdmin() {
 		bindings.Bindings = append(bindings.Bindings,
 			configure.Binding)
+		bindings.Bindings = append(bindings.Bindings,
+			info.Binding)
 	}
 
 	return apps.NewDataResponse([]apps.Binding{

@@ -21,6 +21,19 @@ const IconPath = "icon.png"
 var AppPathPrefix = ""
 var Log = utils.MustMakeCommandLogger(zapcore.DebugLevel)
 
+var BuildHash string
+var BuildHashShort string
+var BuildDate string
+
+const (
+	fAccountJSON  = "account_json"
+	fAPIKey       = "api_key"
+	fClientID     = "client_id"
+	fClientSecret = "client_secret"
+	fMode         = "mode"
+	fState        = "state"
+)
+
 type CallRequest struct {
 	apps.CallRequest
 
@@ -46,6 +59,7 @@ func Init() {
 
 	// Commands
 	HandleSimpleCommand(configure)
+	HandleSimpleCommand(info)
 	HandleSimpleCommand(connect)
 	HandleSimpleCommand(disconnect)
 	HandleSimpleCommand(debug)
@@ -54,6 +68,8 @@ func Init() {
 	// Modals
 	HandleCall("/configure-modal/submit",
 		RequireAdmin(handleConfigureModal))
+	HandleCall("/configure-modal/form",
+		RequireAdmin(FormHandler(handleConfigureModalForm)))
 
 	// Lookups
 	HandleCall(subscribe.Path+"/lookup",
@@ -68,9 +84,12 @@ func Init() {
 
 type HandlerFunc func(CallRequest) apps.CallResponse
 
-func FormHandler(h func(CallRequest) apps.Form) HandlerFunc {
+func FormHandler(h func(CallRequest) (apps.Form, error)) HandlerFunc {
 	return func(creq CallRequest) apps.CallResponse {
-		f := h(creq)
+		f, err := h(creq)
+		if err != nil {
+			return apps.NewErrorResponse(err)
+		}
 		return apps.NewFormResponse(f)
 	}
 }
@@ -105,12 +124,12 @@ func RequireAdmin(h HandlerFunc) HandlerFunc {
 func doHandleCall(w http.ResponseWriter, req *http.Request, h HandlerFunc) {
 	creq := CallRequest{}
 	creq.ctx = context.Background()
-	creq.log = Log.With("path", creq.Path)
 	err := json.NewDecoder(req.Body).Decode(&creq)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
 	}
+	creq.log = Log.With("path", creq.Path)
 
 	cresp := h(creq)
 	if cresp.Type == apps.CallResponseTypeError {

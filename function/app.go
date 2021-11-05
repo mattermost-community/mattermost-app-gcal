@@ -1,16 +1,11 @@
 package function
 
 import (
-	"context"
-	"encoding/json"
 	"fmt"
 	"net/http"
-	"path"
 
 	"go.uber.org/zap/zapcore"
-	"golang.org/x/oauth2"
 
-	"github.com/mattermost/mattermost-plugin-apps/apps"
 	appspath "github.com/mattermost/mattermost-plugin-apps/apps/path"
 	"github.com/mattermost/mattermost-plugin-apps/utils"
 	"github.com/mattermost/mattermost-plugin-apps/utils/httputils"
@@ -25,22 +20,24 @@ var BuildHash string
 var BuildHashShort string
 var BuildDate string
 
+// KV store prefixes
 const (
-	fAccountJSON  = "account_json"
-	fAPIKey       = "api_key"
-	fClientID     = "client_id"
-	fClientSecret = "client_secret"
-	fMode         = "mode"
-	fState        = "state"
+	SubPrefix = "s"
 )
 
-type CallRequest struct {
-	apps.CallRequest
-
-	ts  oauth2.TokenSource
-	ctx context.Context
-	log utils.Logger
-}
+// Field names
+const (
+	fAccountJSON       = "account_json"
+	fAPIKey            = "api_key"
+	fChannel           = "channel"
+	fCalendarID        = "calendar_id"
+	fClientID          = "client_id"
+	fClientSecret      = "client_secret"
+	fMode              = "mode"
+	fState             = "state"
+	fUseServiceAccount = "use_service_account"
+	fImpersonateEmail  = "impersonate_email"
+)
 
 func Init() {
 	// Ping
@@ -58,12 +55,13 @@ func Init() {
 	HandleCall(appspath.Webhook, webhookReceived)
 
 	// Commands
-	HandleSimpleCommand(configure)
-	HandleSimpleCommand(info)
-	HandleSimpleCommand(connect)
-	HandleSimpleCommand(disconnect)
-	HandleSimpleCommand(debug)
-	HandleSimpleCommand(subscribe)
+	HandleCommand(configure)
+	HandleCommand(info)
+	HandleCommand(connect)
+	HandleCommand(disconnect)
+	HandleCommand(debugListCalendars)
+	HandleCommand(debugListEvents)
+	HandleCommand(subscribe)
 
 	// Modals
 	HandleCall("/configure-modal/submit",
@@ -71,79 +69,14 @@ func Init() {
 	HandleCall("/configure-modal/form",
 		RequireAdmin(FormHandler(handleConfigureModalForm)))
 
-	// Lookups
-	HandleCall(subscribe.Path+"/lookup",
-		RequireGoogleToken(LookupHandler(lookupSubscribeCalendar)))
+	// Lookups TODO rework when the paths are decoupled from forms
+	HandleCall(subscribe.Path()+"/lookup",
+		RequireGoogleToken(handleCalendarIDLookup(nil)))
+	HandleCall(debugListEvents.Path()+"/lookup",
+		RequireGoogleToken(handleCalendarIDLookup(nil)))
 
 	http.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
 		Log.Warnw("not found", "path", req.URL.Path, "method", req.Method)
 		http.Error(w, fmt.Sprintf("Not found: %s %q", req.Method, req.URL.Path), http.StatusNotFound)
 	})
-
-}
-
-type HandlerFunc func(CallRequest) apps.CallResponse
-
-func FormHandler(h func(CallRequest) (apps.Form, error)) HandlerFunc {
-	return func(creq CallRequest) apps.CallResponse {
-		f, err := h(creq)
-		if err != nil {
-			return apps.NewErrorResponse(err)
-		}
-		return apps.NewFormResponse(f)
-	}
-}
-
-func LookupHandler(h func(CallRequest) []apps.SelectOption) HandlerFunc {
-	return func(creq CallRequest) apps.CallResponse {
-		opts := h(creq)
-		return apps.NewLookupResponse(opts)
-	}
-}
-
-func HandleCall(p string, h HandlerFunc) {
-	http.HandleFunc(AppPathPrefix+p, func(w http.ResponseWriter, req *http.Request) {
-		doHandleCall(w, req, h)
-	})
-}
-
-func HandleSimpleCommand(command SimpleCommand) {
-	HandleCall(command.Submit.Path+"/submit", command.Handler)
-}
-
-func RequireAdmin(h HandlerFunc) HandlerFunc {
-	return func(creq CallRequest) apps.CallResponse {
-		if creq.Context.AdminAccessToken == "" {
-			return apps.NewErrorResponse(
-				utils.NewUnauthorizedError("missing admin access token, required to invoke " + creq.Path))
-		}
-		return h(creq)
-	}
-}
-
-func doHandleCall(w http.ResponseWriter, req *http.Request, h HandlerFunc) {
-	creq := CallRequest{}
-	creq.ctx = context.Background()
-	err := json.NewDecoder(req.Body).Decode(&creq)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-	creq.log = Log.With("path", creq.Path)
-
-	cresp := h(creq)
-	if cresp.Type == apps.CallResponseTypeError {
-		creq.log.WithError(cresp).Debugw("Call failed.")
-	}
-	_ = httputils.WriteJSON(w, cresp)
-}
-
-func remarshal(dst, src interface{}) {
-	data, _ := json.Marshal(src)
-	json.Unmarshal(data, dst)
-}
-
-func (creq CallRequest) appProxyURL(paths ...string) string {
-	p := path.Join(append([]string{creq.Context.AppPath}, paths...)...)
-	return creq.Context.MattermostSiteURL + p
 }

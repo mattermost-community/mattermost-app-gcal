@@ -1,11 +1,15 @@
 package function
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/pkg/errors"
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
+	"google.golang.org/api/calendar/v3"
+	oauth2api "google.golang.org/api/oauth2/v2"
+	"google.golang.org/api/option"
 
 	"github.com/mattermost/mattermost-plugin-apps/apps"
 	"github.com/mattermost/mattermost-plugin-apps/apps/appclient"
@@ -13,7 +17,7 @@ import (
 )
 
 var OAuth2Scopes = []string{
-	"https://www.googleapis.com/auth/calendar",
+	calendar.CalendarScope,
 	"https://www.googleapis.com/auth/userinfo.profile",
 	"https://www.googleapis.com/auth/userinfo.email",
 }
@@ -43,46 +47,35 @@ func oauth2Complete(creq CallRequest) apps.CallResponse {
 		return apps.NewErrorResponse(errors.Wrap(err, "failed token exchange"))
 	}
 
-	err = StoreOAuth2User(creq, token)
+	oauth2Service, err := oauth2api.NewService(creq.ctx,
+		option.WithTokenSource(oauth2Config.TokenSource(creq.ctx, token)))
+	if err != nil {
+		return apps.NewErrorResponse(errors.Wrap(err, "failed to get OAuth2 service"))
+	}
+	uiService := oauth2api.NewUserinfoService(oauth2Service)
+	ui, err := uiService.V2.Me.Get().Do()
+	if err != nil {
+		return apps.NewErrorResponse(errors.Wrap(err, "failed to get user info"))
+	}
+
+	asActingUser := appclient.AsActingUser(creq.Context)
+	err = asActingUser.StoreOAuth2User(creq.Context.AppID, User{
+		Token: token,
+		Email: ui.Email,
+		ID:    ui.Id,
+	})
 	if err != nil {
 		return apps.NewErrorResponse(errors.Wrap(err, "failed to store OAuth user info to Mattermost"))
 	}
 	return apps.NewTextResponse("completed connecting to Google Calendar with OAuth2.")
 }
 
-func StoreOAuth2User(creq CallRequest, token *oauth2.Token) error {
-	asActingUser := appclient.AsActingUser(creq.Context)
-	return asActingUser.StoreOAuth2User(creq.Context.AppID, token)
-}
-
-func RequireGoogleToken(h HandlerFunc) HandlerFunc {
-	return func(creq CallRequest) apps.CallResponse {
-		if creq.Context.OAuth2.User == "" {
-			return apps.NewErrorResponse(
-				utils.NewUnauthorizedError("missing google token, required to invoke " + creq.Path))
-		}
-		oauthConfig := oauth2Config(creq)
-		token := oauth2.Token{}
-		remarshal(&token, creq.Context.OAuth2.User)
-
-		creq.ts = oauthConfig.TokenSource(creq.ctx, &token)
-
-		// Store new token if refreshed
-		newToken, err := creq.ts.Token()
-		if err == nil && newToken.AccessToken != token.AccessToken {
-			_ = appclient.AsActingUser(creq.Context).StoreOAuth2User(creq.Context.AppID, newToken)
-		}
-
-		return h(creq)
-	}
-}
-
 type ServiceAccount struct {
-	// Mode is either "api_key", "service_account", or "" implying no service
+	// Mode is either "api_key", "account_json", or "" implying no service
 	// account is to be used, and the corresponding functionality disabled.
-	Mode        string `json:"mode"`              // fMode
-	APIKey      string `json:"api_key,omitempty"` // fAPIKey
-	AccountJSON string `json:"account_json"`      // fAccountJSON
+	Mode        string `json:"mode,omitempty"`         // fMode
+	APIKey      string `json:"api_key,omitempty"`      // fAPIKey
+	AccountJSON string `json:"account_json,omitempty"` // fAccountJSON
 }
 
 func NewServiceAccount(mode, apiKey, serviceAccout string) ServiceAccount {
@@ -98,21 +91,34 @@ func NewServiceAccount(mode, apiKey, serviceAccout string) ServiceAccount {
 	return sa
 }
 
-func ServiceAccountFromRequest(creq CallRequest) ServiceAccount {
-	m, _ := creq.Context.OAuth2.OAuth2App.Data.(map[string]interface{})
-	mode, _ := m[fMode].(string)
-	apiKey, _ := m[fAPIKey].(string)
-	serviceAccount, _ := m[fAccountJSON].(string)
-	return NewServiceAccount(mode, apiKey, serviceAccount)
-}
-
 func (sa ServiceAccount) String() string {
 	switch sa.Mode {
 	case fAPIKey:
 		return fmt.Sprintf("API Key, ending in %q", utils.LastN(sa.APIKey, 8))
 	case fAccountJSON:
-		return fmt.Sprintf("Account JSON, ending in %q", utils.LastN(sa.APIKey, 8))
+		return fmt.Sprintf("Account JSON, ending in %q", utils.LastN(sa.AccountJSON, 32))
 	default:
 		return "No service account"
+	}
+}
+
+func (sa ServiceAccount) AuthOption(ctx context.Context, userEmail string) (option.ClientOption, error) {
+	switch sa.Mode {
+	case fAccountJSON:
+		config, err := google.JWTConfigFromJSON(
+			[]byte(sa.AccountJSON),
+			calendar.CalendarScope)
+		if err != nil {
+			return nil, fmt.Errorf("JWTConfigFromJSON: %v", err)
+		}
+		config.Subject = userEmail
+
+		return option.WithTokenSource(config.TokenSource(ctx)), nil
+
+	case fAPIKey:
+		return option.WithAPIKey(sa.APIKey), nil
+
+	default:
+		return nil, errors.New("service account authentication is not configured")
 	}
 }

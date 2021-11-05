@@ -2,35 +2,38 @@ package function
 
 import (
 	"github.com/mattermost/mattermost-plugin-apps/apps"
-	"golang.org/x/oauth2"
 )
 
 func bindings(creq CallRequest) apps.CallResponse {
-
 	bindings := apps.Binding{
 		Icon:        IconPath,
 		Label:       "gcal",
 		Description: "Google Calendar Mattermost App",
 	}
 
-	token := oauth2.Token{}
-	remarshal(&token, creq.Context.OAuth2.User)
-	if token.AccessToken == "" {
+	if creq.Context.OAuth2.User == nil {
 		bindings.Bindings = append(bindings.Bindings,
-			connect.Binding)
+			connect.Binding(creq))
 	} else {
 		bindings.Bindings = append(bindings.Bindings,
-			debug.Binding,
-			subscribe.Binding,
-			disconnect.Binding,
+			apps.Binding{
+				Label: "debug",
+				Bindings: []apps.Binding{
+					debugListCalendars.Binding(creq),
+					debugListEvents.Binding(creq),
+				},
+				Icon: IconPath,
+			},
+			subscribe.Binding(creq),
+			disconnect.Binding(creq),
 		)
 	}
 
-	if creq.Context.ActingUser.IsSystemAdmin() {
+	if creq.Context.ActingUser != nil && creq.Context.ActingUser.IsSystemAdmin() {
 		bindings.Bindings = append(bindings.Bindings,
-			configure.Binding)
+			configure.Binding(creq))
 		bindings.Bindings = append(bindings.Bindings,
-			info.Binding)
+			info.Binding(creq))
 	}
 
 	return apps.NewDataResponse([]apps.Binding{

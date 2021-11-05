@@ -7,22 +7,24 @@ import (
 	"github.com/pkg/errors"
 )
 
-var configure = SimpleCommand{
+var configure = Command{
 	Name: "configure",
-	Submit: apps.Call{
+	BaseSubmit: apps.Call{
 		Expand: &apps.Expand{
-			AdminAccessToken: apps.ExpandAll,
-			OAuth2App:        apps.ExpandAll,
+			ActingUser:            apps.ExpandSummary,
+			ActingUserAccessToken: apps.ExpandAll,
+			OAuth2App:             apps.ExpandAll,
 		},
 	},
-	Form: apps.Form{
+	BaseForm: apps.Form{
 		Title: "Configure Google Calendar App",
 	},
 
 	// Handler will display the configure form as a modal, to enter the service
 	// account JSON, not possible in autocomplete, yet.
-	Handler: RequireAdmin(FormHandler(handleConfigureModalForm)),
-}.Init()
+	Handler: RequireAdmin(
+		FormHandler(handleConfigureModalForm)),
+}
 
 func handleConfigureModal(creq CallRequest) apps.CallResponse {
 	clientID := creq.GetValue(fClientID, "")
@@ -31,9 +33,9 @@ func handleConfigureModal(creq CallRequest) apps.CallResponse {
 	apiKey := creq.GetValue(fAPIKey, "")
 	serviceAccount := creq.GetValue(fAccountJSON, "")
 
-	asAdmin := appclient.AsAdmin(creq.Context)
+	asActingUser := appclient.AsActingUser(creq.Context)
 	sa := NewServiceAccount(mode, apiKey, serviceAccount)
-	err := asAdmin.StoreOAuth2App(creq.Context.AppID, apps.OAuth2App{
+	err := asActingUser.StoreOAuth2App(creq.Context.AppID, apps.OAuth2App{
 		ClientID:     clientID,
 		ClientSecret: clientSecret,
 		Data:         sa,
@@ -66,7 +68,8 @@ func handleConfigureModalForm(creq CallRequest) (apps.Form, error) {
 		Call: &apps.Call{
 			Path: "/configure-modal",
 			Expand: &apps.Expand{
-				AdminAccessToken: apps.ExpandAll,
+				ActingUserAccessToken: apps.ExpandAll,
+				ActingUser:            apps.ExpandSummary,
 			},
 		},
 		Title: "Configure Google Calendar App credentials",
@@ -151,8 +154,6 @@ func handleConfigureModalForm(creq CallRequest) (apps.Form, error) {
 			Value:         accountJSON,
 		})
 	}
-
-	Log.Debugf("%s", utils.Pretty(f))
 
 	return f, nil
 }

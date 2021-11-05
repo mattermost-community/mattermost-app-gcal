@@ -5,7 +5,6 @@ import (
 
 	"github.com/pkg/errors"
 	"google.golang.org/api/calendar/v3"
-	"google.golang.org/api/option"
 
 	"github.com/mattermost/mattermost-plugin-apps/apps"
 	"github.com/mattermost/mattermost-plugin-apps/apps/appclient"
@@ -14,8 +13,6 @@ import (
 )
 
 func webhookReceived(creq CallRequest) apps.CallResponse {
-	creq.log.Debugf("<>/<> WEBHOOK 1: values: %s", utils.Pretty(creq.Values))
-	creq.log.Debugf("<>/<> WEBHOOK 2: type of headers: %T", creq.Values["headers"])
 	headers, ok := creq.Values["headers"].(map[string]interface{})
 	if !ok {
 		return apps.NewErrorResponse(utils.NewInvalidError(
@@ -31,50 +28,68 @@ func webhookReceived(creq CallRequest) apps.CallResponse {
 	}
 	s := Sub{}
 	err := asBot.KVGet(subID, SubPrefix, &s)
-	if err != nil {
+	if err != nil && errors.Cause(err) != utils.ErrNotFound {
 		return apps.NewErrorResponse(err)
 	}
-	creq.log.Debugf("<>/<> WEBHOOK 3: loaded sub: %s", utils.Pretty(s))
 
-	calID, ok := headers["X-Goog-Resource-Id"].(string)
-	if !ok || calID == "" {
-		return apps.NewErrorResponse(utils.NewInvalidError(
-			"header X-Goog-Resource-Id not found in the Google webhook request"))
+	// DM (personal) webhooks should impersonate the user to access the
+	// calendar. Channel (shared) webhooks must use the unaltered service
+	// account credentials.
+	impersonate := ""
+	if s.MattermostChannelID == "" {
+		impersonate = s.GoogleEmail
 	}
-
-	sa := ServiceAccountFromRequest(creq)
-	creq.log.Debugf("<>/<> WEBHOOK 4: sa: %s", utils.Pretty(sa))
-
-	var authOpt option.ClientOption
-	switch sa.Mode {
-	case fAccountJSON:
-		authOpt = option.WithCredentialsJSON([]byte(sa.AccountJSON))
-	case fAPIKey:
-		authOpt = option.WithAPIKey(sa.APIKey)
-	default:
-		return apps.NewErrorResponse(errors.New(
-			"no service account available to process Google webhook request, use `/gcal configure` to update"))
-	}
-
-	calService, err := calendar.NewService(creq.ctx, authOpt, option.WithScopes(OAuth2Scopes...))
+	opt, err := ServiceAccountFromRequest(creq).AuthOption(creq.ctx, impersonate)
 	if err != nil {
-		return apps.NewErrorResponse(errors.Wrap(err, "failed to get Calendar client to Google"))
+		return apps.NewErrorResponse(
+			errors.Wrap(err, "failed to authenticate to Google"))
 	}
-	creq.log.Debugf("<>/<> WEBHOOK 6: got an %q client", sa.Mode)
 
-	events, err := calService.Events.List(calID).Do()
+	calService, err := calendar.NewService(creq.ctx, opt)
 	if err != nil {
-		return apps.NewErrorResponse(errors.Wrap(err, "failed to get calendar events"))
+		return apps.NewErrorResponse(
+			errors.Wrap(err, "failed to get Calendar client to Google"))
 	}
-	creq.log.Debugf("<>/<> WEBHOOK 7: got %v events", len(events.Items))
+	if s.SubID != subID {
+		resourceID, _ := headers["X-Goog-Resource-Id"].(string)
+		creq.CleanupOrphantSub(subID, resourceID, s)
+	}
 
-	asBot.DMPost(s.MattermostUserID, &model.Post{
+	syncToken := s.SyncToken
+	resourceState, _ := headers["X-Goog-Channel-Id"].(string)
+	if resourceState == "sync" {
+		syncToken = ""
+	}
+	events, err := calService.Events.List(s.CalendarID).SyncToken(syncToken).Do()
+	if err != nil {
+		return apps.NewErrorResponse(
+			errors.Wrap(err, "failed to list events"))
+	}
+
+	postf := func(p model.Post) {
+		asBot.DMPost(s.MattermostUserID, &p)
+	}
+	if s.MattermostChannelID != "" {
+		postf = func(p model.Post) {
+			p.ChannelId = s.MattermostChannelID
+			asBot.CreatePost(&p)
+		}
+	}
+
+	// Post the results.
+	postf(model.Post{
 		Message: fmt.Sprintf("received notification: %s", utils.JSONBlock(headers)),
 	})
-
-	asBot.DMPost(s.MattermostUserID, &model.Post{
+	postf(model.Post{
 		Message: fmt.Sprintf("events: %s", utils.JSONBlock(events)),
 	})
+
+	// Update the sync token in the subscription.
+	s.SyncToken = events.NextSyncToken
+	err = creq.StoreSub(s)
+	if err != nil {
+		return apps.NewErrorResponse(errors.Wrap(err, "failed to update sync token in subscription"))
+	}
 
 	return apps.NewTextResponse("OK")
 }

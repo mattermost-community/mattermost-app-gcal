@@ -5,7 +5,6 @@
     "icon": "icon.png",
     "homepage_url": "https://github.com/mattermost/mattermost-app-gcal",
     "requested_permissions": [
-        "act_as_admin",
         "act_as_bot",
         "act_as_user",
         "remote_oauth2",

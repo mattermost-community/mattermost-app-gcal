@@ -19,8 +19,10 @@ func bindings(creq CallRequest) apps.CallResponse {
 			apps.Binding{
 				Label: "debug",
 				Bindings: []apps.Binding{
+					debugGetEvent.Binding(creq),
 					debugListCalendars.Binding(creq),
 					debugListEvents.Binding(creq),
+					debugUserInfo.Binding(creq),
 				},
 				Icon: IconPath,
 			},

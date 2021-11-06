@@ -5,40 +5,52 @@ import (
 	"google.golang.org/api/calendar/v3"
 )
 
-func fieldCalendarID(isRequired bool, autocompletePosition int) apps.Field {
+func fieldEventID(isRequired bool, autocompletePosition int) apps.Field {
 	return apps.Field{
 		Type:                 apps.FieldTypeDynamicSelect,
-		Name:                 fCalendarID,
-		Description:          "Choose a Google Calendar",
+		Name:                 fEventID,
+		Description:          "Choose an Event",
 		IsRequired:           isRequired,
 		AutocompletePosition: autocompletePosition,
 	}
 }
 
-func handleCalendarIDLookup(
-	filter func(*calendar.CalendarListEntry) bool,
+func handleGetEventLookup(creq CallRequest) apps.CallResponse {
+	creq.log.Debugf("<>/<> handleGetEventLookup for %q", creq.SelectedField)
+	switch creq.SelectedField {
+	case fCalendarID:
+		return handleCalendarIDLookup(nil)(creq)
+	case fEventID:
+		return handleEventIDLookup(nil)(creq)
+	}
+	return apps.NewLookupResponse(nil)
+}
+
+func handleEventIDLookup(
+	filter func(*calendar.Event) bool,
 ) HandlerFunc {
 	h := func(creq CallRequest) []apps.SelectOption {
 		opts := []apps.SelectOption{}
+
 		calService, err := calendar.NewService(creq.ctx, creq.authOption)
 		if err != nil {
 			creq.log.WithError(err).Warnf("failed to get Calendar client.")
 			return nil
 		}
 
-		cl, err := calService.CalendarList.List().Do()
+		calID := creq.GetValue(fCalendarID, "")
+		if calID == "" {
+			return nil
+		}
+		el, err := calService.Events.List(calID).Do()
 		if err != nil {
-			creq.log.WithError(err).Warnf("failed to get the list of Google calendars.")
+			creq.log.WithError(err).Warnf("failed to get the list of events.")
 			return nil
 		}
 
-		for _, item := range cl.Items {
+		for _, item := range el.Items {
 			if filter != nil {
 				if !filter(item) {
-					continue
-				}
-			} else {
-				if item.Deleted || item.Hidden {
 					continue
 				}
 			}

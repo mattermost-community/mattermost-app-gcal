@@ -21,26 +21,58 @@ var debugListCalendars = Command{
 		},
 	},
 
-	BaseForm: apps.Form{
-		Title: "Test Google Cal",
-		Fields: []apps.Field{
-			fieldUseServiceAccount,
-			fieldImpersonateEmail,
-		},
-	},
+	Handler: RequireGoogleAuth(
+		func(creq CallRequest) apps.CallResponse {
+			outJSON := creq.BoolValue(fJSON)
 
-	Handler: RequireGoogleToken(func(creq CallRequest) apps.CallResponse {
-		calService, err := calendar.NewService(creq.ctx, WithCommandAuth(creq))
-		if err != nil {
-			return apps.NewErrorResponse(errors.Wrap(err, "failed to get Calendar client to Google"))
-		}
+			calService, err := calendar.NewService(creq.ctx, creq.authOption)
+			if err != nil {
+				return apps.NewErrorResponse(errors.Wrap(err, "failed to get Calendar client to Google"))
+			}
+			cl, err := calService.CalendarList.List().Do()
+			if err != nil {
+				return apps.NewErrorResponse(errors.Wrap(err, "failed to get list of Calendars"))
+			}
 
-		cl, err := calService.CalendarList.List().Do()
-		if err != nil {
-			return apps.NewErrorResponse(errors.Wrap(err, "failed to get list of Calendars"))
-		}
-		message := fmt.Sprintf("Calendar list:\n%s\n", utils.JSONBlock(cl))
+			if len(cl.Items) == 0 {
+				message := "No Google Calendars for this account"
+				if outJSON {
+					message += "\n----\n"
+					message += utils.JSONBlock(cl)
+				}
+				return apps.NewTextResponse(message)
+			}
 
-		return apps.NewTextResponse(message)
-	}),
+			message := "#### List of Google Calendars:\n\n"
+
+			for _, item := range cl.Items {
+				message += "- "
+				if item.Deleted {
+					message += "~~"
+				}
+				message += fmt.Sprintf("**%s** `%s` (%s)", item.Summary, item.Id, item.AccessRole)
+				if item.Hidden {
+					message += ", hidden"
+				}
+				if item.Selected {
+					message += ", selected"
+				}
+				if item.Deleted {
+					message += "~~"
+				}
+				message += ".\n"
+
+				if item.Description != "" {
+					message += fmt.Sprintf("  %s\n", item.Description)
+				}
+				message += "\n"
+			}
+
+			if outJSON {
+				message += "----\n"
+				message += utils.JSONBlock(cl)
+			}
+
+			return apps.NewTextResponse(message)
+		}),
 }

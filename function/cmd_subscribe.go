@@ -3,7 +3,6 @@ package function
 import (
 	"github.com/pkg/errors"
 	"google.golang.org/api/calendar/v3"
-	"google.golang.org/api/option"
 
 	"github.com/mattermost/mattermost-server/v6/model"
 
@@ -38,7 +37,7 @@ var subscribe = Command{
 		},
 	},
 
-	Handler: RequireGoogleToken(
+	Handler: RequireGoogleAuth(
 		func(creq CallRequest) apps.CallResponse {
 			calID := creq.GetValue(fCalendarID, "")
 			if calID == "" {
@@ -132,7 +131,7 @@ var subscribeList = Command{
 		Title: "List my subscriptions",
 	},
 
-	Handler: RequireGoogleToken(
+	Handler: RequireGoogleAuth(
 		func(creq CallRequest) apps.CallResponse {
 
 			calID := creq.GetValue(fCalendarID, "")
@@ -181,7 +180,7 @@ var subscribeList = Command{
 				return apps.NewErrorResponse(errors.Wrap(err, "failed to store incomplete subscription"))
 			}
 
-			calService, err := calendar.NewService(creq.ctx, option.WithTokenSource(creq.ts))
+			calService, err := calendar.NewService(creq.ctx, creq.authOption)
 			if err != nil {
 				return apps.NewErrorResponse(errors.Wrap(err, "failed to get Calendar client to Google"))
 			}

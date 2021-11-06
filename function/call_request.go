@@ -6,21 +6,21 @@ import (
 	"net/http"
 	"path"
 
-	"golang.org/x/oauth2"
-
 	"github.com/mattermost/mattermost-plugin-apps/apps"
 	"github.com/mattermost/mattermost-plugin-apps/apps/appclient"
 	"github.com/mattermost/mattermost-plugin-apps/utils"
 	"github.com/mattermost/mattermost-plugin-apps/utils/httputils"
+	"github.com/pkg/errors"
+	"google.golang.org/api/option"
 )
 
 type CallRequest struct {
 	apps.CallRequest
 
-	user User
-	ts   oauth2.TokenSource
-	ctx  context.Context
-	log  utils.Logger
+	user       User
+	authOption option.ClientOption
+	ctx        context.Context
+	log        utils.Logger
 }
 
 type HandlerFunc func(CallRequest) apps.CallResponse
@@ -62,24 +62,35 @@ func RequireAdmin(h HandlerFunc) HandlerFunc {
 	}
 }
 
-func RequireGoogleToken(h HandlerFunc) HandlerFunc {
+func RequireGoogleAuth(h HandlerFunc) HandlerFunc {
 	return RequireGoogleUser(func(creq CallRequest) apps.CallResponse {
-		token := creq.user.Token
-		if token == nil {
-			return apps.NewErrorResponse(
-				utils.NewUnauthorizedError("missing Google OAuth2 token in the user record, required for " + creq.Path + ". Please use `/apps connect` to connect your Google account."))
+		if !creq.BoolValue(fUseServiceAccount) {
+			token := creq.user.Token
+			if token == nil {
+				return apps.NewErrorResponse(
+					utils.NewUnauthorizedError("missing Google OAuth2 token in the user record, required for " + creq.Path + ". Please use `/apps connect` to connect your Google account."))
+			}
+
+			oauthConfig := oauth2Config(creq)
+			ts := oauthConfig.TokenSource(creq.ctx, token)
+
+			// Store new token if refreshed
+			newToken, err := ts.Token()
+			if err == nil && newToken.AccessToken != token.AccessToken {
+				creq.user.Token = newToken
+				_ = appclient.AsActingUser(creq.Context).StoreOAuth2User(creq.Context.AppID, creq.user)
+			}
+
+			creq.authOption = option.WithTokenSource(ts)
+		} else {
+			email := creq.GetValue(fImpersonateEmail, "")
+			opt, err := ServiceAccountFromRequest(creq).AuthOption(creq.ctx, email)
+			if err != nil {
+				return apps.NewErrorResponse(
+					errors.Wrap(err, "failed to get service account impersonation auth option"))
+			}
+			creq.authOption = opt
 		}
-
-		oauthConfig := oauth2Config(creq)
-		creq.ts = oauthConfig.TokenSource(creq.ctx, token)
-
-		// Store new token if refreshed
-		newToken, err := creq.ts.Token()
-		if err == nil && newToken.AccessToken != token.AccessToken {
-			creq.user.Token = newToken
-			_ = appclient.AsActingUser(creq.Context).StoreOAuth2User(creq.Context.AppID, creq.user)
-		}
-
 		return h(creq)
 	})
 }

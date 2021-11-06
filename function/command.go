@@ -41,6 +41,7 @@ func (c Command) Form(creq CallRequest) *apps.Form {
 		f.Call.Path = c.Path()
 	}
 
+	f.Fields = appendDebugFields(f.Fields, creq)
 	for i, field := range f.Fields {
 		if field.Label == "" {
 			f.Fields[i].Label = strings.ReplaceAll(field.Name, "_", "-")
@@ -49,6 +50,7 @@ func (c Command) Form(creq CallRequest) *apps.Form {
 			f.Fields[i].ModalLabel = strings.ReplaceAll(field.Name, "_", " ")
 		}
 	}
+
 	return &f
 }
 

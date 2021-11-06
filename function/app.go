@@ -29,14 +29,16 @@ const (
 const (
 	fAccountJSON       = "account_json"
 	fAPIKey            = "api_key"
-	fChannel           = "channel"
 	fCalendarID        = "calendar_id"
+	fChannel           = "channel"
 	fClientID          = "client_id"
 	fClientSecret      = "client_secret"
+	fEventID           = "event_id"
+	fImpersonateEmail  = "impersonate_email"
+	fJSON              = "json"
 	fMode              = "mode"
 	fState             = "state"
 	fUseServiceAccount = "use_service_account"
-	fImpersonateEmail  = "impersonate_email"
 )
 
 func Init() {
@@ -56,11 +58,13 @@ func Init() {
 
 	// Commands
 	HandleCommand(configure)
-	HandleCommand(info)
 	HandleCommand(connect)
-	HandleCommand(disconnect)
+	HandleCommand(debugGetEvent)
 	HandleCommand(debugListCalendars)
 	HandleCommand(debugListEvents)
+	HandleCommand(debugUserInfo)
+	HandleCommand(disconnect)
+	HandleCommand(info)
 	HandleCommand(subscribe)
 
 	// Modals
@@ -71,9 +75,11 @@ func Init() {
 
 	// Lookups TODO rework when the paths are decoupled from forms
 	HandleCall(subscribe.Path()+"/lookup",
-		RequireGoogleToken(handleCalendarIDLookup(nil)))
+		RequireGoogleAuth(handleCalendarIDLookup(nil)))
 	HandleCall(debugListEvents.Path()+"/lookup",
-		RequireGoogleToken(handleCalendarIDLookup(nil)))
+		RequireGoogleAuth(handleCalendarIDLookup(nil)))
+	HandleCall(debugGetEvent.Path()+"/lookup",
+		RequireGoogleAuth(handleGetEventLookup))
 
 	http.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
 		Log.Warnw("not found", "path", req.URL.Path, "method", req.Method)

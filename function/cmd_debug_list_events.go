@@ -5,8 +5,6 @@ import (
 
 	"github.com/pkg/errors"
 	"google.golang.org/api/calendar/v3"
-	oauth2api "google.golang.org/api/oauth2/v2"
-	"google.golang.org/api/option"
 
 	"github.com/mattermost/mattermost-plugin-apps/apps"
 	"github.com/mattermost/mattermost-plugin-apps/utils"
@@ -27,42 +25,48 @@ var debugListEvents = Command{
 		Title: "Test Google Cal",
 		Fields: []apps.Field{
 			fieldCalendarID(true, 1),
-			fieldUseServiceAccount,
-			fieldImpersonateEmail,
+			fieldDebugUseServiceAccount,
+			fieldDebugImpersonateEmail,
 		},
 	},
 
-	Handler: RequireGoogleToken(func(creq CallRequest) apps.CallResponse {
-		message := ""
-		oauth2Service, err := oauth2api.NewService(creq.ctx, option.WithTokenSource(creq.ts))
-		if err != nil {
-			return apps.NewErrorResponse(errors.Wrap(err, "failed to get OAuth2 service"))
-		}
-		uiService := oauth2api.NewUserinfoService(oauth2Service)
-		ui, err := uiService.V2.Me.Get().Do()
-		if err != nil {
-			return apps.NewErrorResponse(errors.Wrap(err, "failed to get user info"))
-		}
-		message += fmt.Sprintf("#### User info:\n%s\n", utils.JSONBlock(ui))
-
+	Handler: RequireGoogleAuth(func(creq CallRequest) apps.CallResponse {
+		outJSON := creq.BoolValue(fJSON)
 		calID := creq.GetValue(fCalendarID, "")
-		calService, err := calendar.NewService(creq.ctx, WithCommandAuth(creq))
+		calService, err := calendar.NewService(creq.ctx, creq.authOption)
 		if err != nil {
 			return apps.NewErrorResponse(errors.Wrap(err, "failed to get Calendar client to Google"))
 		}
-
-		cal, err := calService.Calendars.Get(calID).Do()
-		if err != nil {
-			return apps.NewErrorResponse(errors.Wrap(err, "failed to get calendar"))
-		}
-		message += fmt.Sprintf("#### Calendar:\n%s\n", utils.JSONBlock(cal))
 
 		events, err := calService.Events.List(calID).Do()
 		if err != nil {
 			return apps.NewErrorResponse(errors.Wrap(err, "failed to list events"))
 		}
+		if len(events.Items) == 0 {
+			message := fmt.Sprintf("No Google Calendar Events found in %s.", events.Description)
+			if outJSON {
+				message += "\n----\n"
+				message += utils.JSONBlock(events)
+			}
+			return apps.NewTextResponse(message)
+		}
 
-		message += fmt.Sprintf("#### Events:\n%s\n", utils.JSONBlock(events))
+		message := "#### List of Google Calendar events."
+		for _, item := range events.Items {
+			message += fmt.Sprintf("- %s\n", EventSummaryString(item))
+			if len(item.Attendees) > 0 {
+				message += fmt.Sprintf("  Guests: %s\n", EventAttendeesString(item))
+			}
+			if item.Description != "" {
+				message += fmt.Sprintf("  %s\n", item.Description)
+			}
+		}
+
+		if outJSON {
+			message += "----\n"
+			message += utils.JSONBlock(events)
+		}
+
 		return apps.NewTextResponse(message)
 	}),
 }

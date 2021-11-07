@@ -7,7 +7,6 @@ import (
 	"google.golang.org/api/calendar/v3"
 
 	"github.com/mattermost/mattermost-plugin-apps/apps"
-	"github.com/mattermost/mattermost-plugin-apps/utils"
 )
 
 var debugListEvents = Command{
@@ -31,7 +30,6 @@ var debugListEvents = Command{
 	},
 
 	Handler: RequireGoogleAuth(func(creq CallRequest) apps.CallResponse {
-		outJSON := creq.BoolValue(fJSON)
 		calID := creq.GetValue(fCalendarID, "")
 		calService, err := calendar.NewService(creq.ctx, creq.authOption)
 		if err != nil {
@@ -44,11 +42,7 @@ var debugListEvents = Command{
 		}
 		if len(events.Items) == 0 {
 			message := fmt.Sprintf("No Google Calendar Events found in %s.", events.Description)
-			if outJSON {
-				message += "\n----\n"
-				message += utils.JSONBlock(events)
-			}
-			return apps.NewTextResponse(message)
+			return RespondWithJSON(creq, message, events)
 		}
 
 		message := "#### List of Google Calendar events."
@@ -63,11 +57,6 @@ var debugListEvents = Command{
 			}
 		}
 
-		if outJSON {
-			message += "----\n"
-			message += utils.JSONBlock(events)
-		}
-
-		return apps.NewTextResponse(message)
+		return RespondWithJSON(creq, message, events)
 	}),
 }

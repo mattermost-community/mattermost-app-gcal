@@ -34,7 +34,7 @@ func handleSubscriptionIDLookup(
 				}
 			}
 			opts = append(opts, apps.SelectOption{
-				Label: sub.CalendarID,
+				Label: sub.CalendarSummary,
 				Value: sub.SubID,
 			})
 		}

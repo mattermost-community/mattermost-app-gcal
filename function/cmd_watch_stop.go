@@ -1,13 +1,12 @@
 package function
 
 import (
+	"fmt"
+
 	"github.com/pkg/errors"
 	"google.golang.org/api/calendar/v3"
 
-	"github.com/mattermost/mattermost-server/v6/model"
-
 	"github.com/mattermost/mattermost-plugin-apps/apps"
-	"github.com/mattermost/mattermost-plugin-apps/apps/path"
 	"github.com/mattermost/mattermost-plugin-apps/utils"
 )
 
@@ -24,56 +23,38 @@ var watchStop = Command{
 
 	BaseForm: apps.Form{
 		Fields: []apps.Field{
-			fieldCalendarID(true, 1),
+			fieldSubscriptionID(true, 1),
 		},
 	},
 
 	Handler: RequireGoogleAuth(
 		func(creq CallRequest) apps.CallResponse {
-			calID := creq.GetValue(fCalendarID, "")
-			if calID == "" {
-				return apps.NewErrorResponse(utils.NewInvalidError("no calendar ID provided"))
+			subID := creq.GetValue(fSubscriptionID, "")
+			if subID == "" {
+				return apps.NewErrorResponse(utils.NewInvalidError("no subscription ID provided"))
 			}
-			creq.log = creq.log.With("cal_id", calID)
+			creq.log = creq.log.With("sub_id", subID)
 
-			s := Sub{
-				SubID:            model.NewId(),
-				CalendarID:       calID,
-				CreatorID:        creq.Context.ActingUserID,
-				MattermostUserID: creq.Context.ActingUserID,
-			}
-
-			// Pre-save the "incomplete" subscription record so that it is
-			// available when we get the first sync webhook message.
-			err := creq.StoreSub(s, true)
+			sub, err := creq.LoadSub(subID)
 			if err != nil {
-				return apps.NewErrorResponse(errors.Wrap(err, "failed to pre-save subscription"))
+				return apps.NewErrorResponse(err)
 			}
 
-			channelIn := &calendar.Channel{
-				Id:      s.SubID,
-				Address: creq.appProxyURL(path.Webhook),
-				Type:    "web_hook",
-				Token:   model.NewId(),
-			}
 			calService, err := calendar.NewService(creq.ctx, creq.authOption)
 			if err != nil {
 				return apps.NewErrorResponse(errors.Wrap(err, "failed to get Calendar client to Google"))
 			}
-			channel, err := calService.Events.Watch(calID, channelIn).Do()
-			if err != nil {
-				return apps.NewErrorResponse(errors.Wrapf(err, "failed to watch %s"))
-			}
-			creq.log.Debugf("started watching:\n%s\nresponse: %s", utils.Pretty(channelIn), utils.Pretty(channel))
 
-			// Save the subscription record again, this time complete with the Watch
-			// response.
-			s.Google = channel
-			err = creq.StoreSub(s, false)
+			err = calService.Channels.Stop(sub.Google).Do()
 			if err != nil {
-				return apps.NewErrorResponse(errors.Wrap(err, "failed to complete subscription"))
+				return apps.NewErrorResponse(errors.Wrap(err, "failed to stop Google watch"))
 			}
 
-			return apps.NewTextResponse("Successfully subscribed:%s", utils.JSONBlock(channel))
+			err = creq.DeleteSub(sub)
+			if err != nil {
+				return apps.NewErrorResponse(errors.Wrap(err, "failed to delete subscription record from Mattermost"))
+			}
+
+			return RespondWithJSON(creq, fmt.Sprintf("Successfully unsubscribed: %s", sub.CalendarSummary), sub)
 		}),
 }

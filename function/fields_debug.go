@@ -2,6 +2,7 @@ package function
 
 import (
 	"github.com/mattermost/mattermost-plugin-apps/apps"
+	"github.com/mattermost/mattermost-plugin-apps/utils"
 )
 
 // fieldDebugUseServiceAccount is a predefined command field for
@@ -31,4 +32,13 @@ func appendDebugFields(in []apps.Field, creq CallRequest) []apps.Field {
 		fieldDebugUseServiceAccount,
 		fieldDebugImpersonateEmail,
 		fieldDebugJSON)
+}
+
+func RespondWithJSON(creq CallRequest, message string, v interface{}) apps.CallResponse {
+	outJSON := creq.BoolValue(fJSON)
+	if outJSON {
+		message += "----\n"
+		message += utils.JSONBlock(v)
+	}
+	return apps.NewTextResponse(message)
 }

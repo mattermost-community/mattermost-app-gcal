@@ -6,7 +6,6 @@ import (
 	"google.golang.org/api/calendar/v3"
 
 	"github.com/mattermost/mattermost-plugin-apps/apps"
-	"github.com/mattermost/mattermost-plugin-apps/utils"
 	"github.com/pkg/errors"
 )
 
@@ -23,8 +22,6 @@ var debugListCalendars = Command{
 
 	Handler: RequireGoogleAuth(
 		func(creq CallRequest) apps.CallResponse {
-			outJSON := creq.BoolValue(fJSON)
-
 			calService, err := calendar.NewService(creq.ctx, creq.authOption)
 			if err != nil {
 				return apps.NewErrorResponse(errors.Wrap(err, "failed to get Calendar client to Google"))
@@ -35,12 +32,7 @@ var debugListCalendars = Command{
 			}
 
 			if len(cl.Items) == 0 {
-				message := "No Google Calendars for this account"
-				if outJSON {
-					message += "\n----\n"
-					message += utils.JSONBlock(cl)
-				}
-				return apps.NewTextResponse(message)
+				return RespondWithJSON(creq, "No Google Calendars for this account", cl)
 			}
 
 			message := "#### List of Google Calendars:\n\n"
@@ -68,11 +60,6 @@ var debugListCalendars = Command{
 				message += "\n"
 			}
 
-			if outJSON {
-				message += "----\n"
-				message += utils.JSONBlock(cl)
-			}
-
-			return apps.NewTextResponse(message)
+			return RespondWithJSON(creq, message, cl)
 		}),
 }

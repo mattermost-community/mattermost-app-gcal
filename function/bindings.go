@@ -54,6 +54,7 @@ func debugBinding(creq CallRequest) apps.Binding {
 			debugGetEvent.Binding(creq),
 			debugListCalendars.Binding(creq),
 			debugListEvents.Binding(creq),
+			debugStopWatch.Binding(creq),
 			debugUserInfo.Binding(creq),
 		},
 		Icon: IconPath,
@@ -64,6 +65,7 @@ func watchBinding(creq CallRequest) apps.Binding {
 	return apps.Binding{
 		Label:    "watch",
 		Location: "watch",
+		Icon:     IconPath,
 		Bindings: []apps.Binding{
 			watchStart.Binding(creq),
 			watchList.Binding(creq),

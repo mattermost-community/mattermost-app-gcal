@@ -1,6 +1,8 @@
 package function
 
 import (
+	"fmt"
+
 	"github.com/pkg/errors"
 	"google.golang.org/api/calendar/v3"
 
@@ -43,11 +45,12 @@ var watchStart = Command{
 				CalendarID:       calID,
 				CreatorID:        creq.Context.ActingUserID,
 				MattermostUserID: creq.Context.ActingUserID,
+				GoogleEmail:      creq.user.Email,
 			}
 
 			// Pre-save the "incomplete" subscription record so that it is
 			// available when we get the first sync webhook message.
-			err := creq.StoreSub(s, true)
+			err := creq.StoreSub(&s, false)
 			if err != nil {
 				return apps.NewErrorResponse(errors.Wrap(err, "failed to pre-save subscription"))
 			}
@@ -71,12 +74,13 @@ var watchStart = Command{
 			// Save the subscription record again, this time complete with the Watch
 			// response.
 			s.Google = channel
-			err = creq.StoreSub(s, false)
+			err = creq.StoreSub(&s, true)
 			if err != nil {
 				return apps.NewErrorResponse(errors.Wrap(err, "failed to complete subscription"))
 			}
 
-			return apps.NewTextResponse("Successfully subscribed:%s", utils.JSONBlock(channel))
+			message := fmt.Sprintf("Subscibed to **%s**\n- ID:`%s`\n- Google resource (channel) ID:`%s`\n- Sync token:`%s`\n", s.CalendarSummary, s.SubID, s.Google.ResourceId, s.SyncToken)
+			return RespondWithJSON(creq, message, s)
 		}),
 }
 

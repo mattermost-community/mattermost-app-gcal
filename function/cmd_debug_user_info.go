@@ -7,7 +7,6 @@ import (
 	oauth2api "google.golang.org/api/oauth2/v2"
 
 	"github.com/mattermost/mattermost-plugin-apps/apps"
-	"github.com/mattermost/mattermost-plugin-apps/utils"
 )
 
 var debugUserInfo = Command{
@@ -37,12 +36,6 @@ var debugUserInfo = Command{
 		message += fmt.Sprintf("- Email: `%s`\n", ui.Email)
 		message += fmt.Sprintf("- Name: `%s %s, %s`\n", ui.Gender, ui.FamilyName, ui.GivenName)
 
-		outJSON := creq.BoolValue(fJSON)
-		if outJSON {
-			message += "----\n"
-			message += utils.JSONBlock(ui)
-		}
-
-		return apps.NewTextResponse(message)
+		return RespondWithJSON(creq, message, ui)
 	}),
 }

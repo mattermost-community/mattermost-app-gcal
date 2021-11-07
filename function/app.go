@@ -49,9 +49,11 @@ const (
 	fClientID          = "client_id"
 	fClientSecret      = "client_secret"
 	fEventID           = "event_id"
+	fID                = "id"
 	fImpersonateEmail  = "impersonate_email"
 	fJSON              = "json"
 	fMode              = "mode"
+	fResourceID        = "resource_id"
 	fState             = "state"
 	fSubscriptionID    = "sub_id"
 	fUseServiceAccount = "use_service_account"
@@ -78,6 +80,7 @@ func Init() {
 	HandleCommand(debugGetEvent)
 	HandleCommand(debugListCalendars)
 	HandleCommand(debugListEvents)
+	HandleCommand(debugStopWatch)
 	HandleCommand(debugUserInfo)
 	HandleCommand(disconnect)
 	HandleCommand(info)

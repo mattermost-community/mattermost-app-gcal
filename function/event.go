@@ -24,15 +24,15 @@ func EventDateTimeString(e *calendar.Event) string {
 		return "(invalid)"
 	}
 	datetime := ""
+	loc, err := time.LoadLocation(e.Start.TimeZone)
+	if err != nil {
+		return "invalid: " + err.Error()
+	}
 
 	if e.Start.Date != "" {
 		// all-day
-		datetime = fmt.Sprintf("%s (%s), all day", e.Start.Date, e.Start.TimeZone)
+		datetime = fmt.Sprintf("%s (%s), all day", e.Start.Date, loc.String())
 	} else {
-		loc, err := time.LoadLocation(e.Start.TimeZone)
-		if err != nil {
-			return "invalid: " + err.Error()
-		}
 		start, err := time.ParseInLocation(time.RFC3339, e.Start.DateTime, loc)
 		if err != nil {
 			return "invalid: " + err.Error()
@@ -89,7 +89,7 @@ func EventAttendeesString(e *calendar.Event) string {
 	return strings.Join(atts, ", ")
 }
 
-func EventDiffString(before *Event, after *calendar.Event) string {
+func EventDiffString(before *Event, after *calendar.Event, calSummary string) string {
 	if after.Id == "" {
 		return fmt.Sprintf("error: empty ID")
 	}
@@ -102,7 +102,7 @@ func EventDiffString(before *Event, after *calendar.Event) string {
 
 	s := ""
 	if before == nil {
-		s = fmt.Sprintf("###### New: %s\n", EventSummaryString(after))
+		s = fmt.Sprintf("###### New in *%s*: %s\n", calSummary, EventSummaryString(after))
 	} else {
 		s = fmt.Sprintf("Updated: %s\n", EventSummaryString(after))
 	}

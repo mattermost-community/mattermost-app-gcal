@@ -47,15 +47,10 @@ func doWebhookReceived(creq CallRequest) error {
 		return errors.Wrap(err, "failed to get Calendar client to Google")
 	}
 
-	syncToken := s.SyncToken
-	resourceState, _ := headers["X-Goog-Resource-State"].(string)
-	if resourceState == "sync" {
-		syncToken = ""
-	}
 	creq.log = creq.log.With("sync_token", s.SyncToken)
 
 	//TODO: implement NextPageToken support
-	events, err := calService.Events.List(s.CalendarID).SyncToken(syncToken).Do()
+	events, err := calService.Events.List(s.CalendarID).SyncToken(s.SyncToken).Do()
 	if err != nil {
 		return errors.Wrap(err, "failed to list events")
 	}
@@ -68,24 +63,29 @@ func doWebhookReceived(creq CallRequest) error {
 			problems = append(problems, err)
 		}
 
-		message := EventDiffString(prev, e)
-
-		if len(problems) > 0 {
-			message += "\n----\n"
-			message += fmt.Sprintf("Errors: %v", problems)
-		}
-
+		resourceState, _ := headers["X-Goog-Resource-State"].(string)
 		rootPostID := ""
 		if prev != nil {
 			rootPostID = prev.RootPostID
 		}
-		post, _ := asBot.DMPost(s.MattermostUserID, &model.Post{
-			Message: message,
-			RootId:  rootPostID,
-		})
-		if rootPostID == "" && post != nil {
-			rootPostID = post.Id
+
+		if resourceState != "sync" {
+			message := EventDiffString(prev, e, events.Summary)
+
+			if len(problems) > 0 {
+				message += "\n----\n"
+				message += fmt.Sprintf("Errors: %v", problems)
+			}
+
+			post, _ := asBot.DMPost(s.MattermostUserID, &model.Post{
+				Message: message,
+				RootId:  rootPostID,
+			})
+			if rootPostID == "" && post != nil {
+				rootPostID = post.Id
+			}
 		}
+
 		err = creq.StoreEvent(s.GoogleEmail, s.CalendarID, &Event{
 			Event:      e,
 			RootPostID: rootPostID,
@@ -96,10 +96,13 @@ func doWebhookReceived(creq CallRequest) error {
 	}
 
 	// Update the sync token in the subscription.
-	s.SyncToken = events.NextSyncToken
-	err = creq.StoreSub(*s, false)
-	if err != nil {
-		return errors.Wrap(err, "failed to update sync token in subscription")
+	if events.NextSyncToken != s.SyncToken {
+		s.SyncToken = events.NextSyncToken
+		s.CalendarSummary = events.Summary
+		err = creq.StoreSub(s, false)
+		if err != nil {
+			return errors.Wrap(err, "failed to update sync token in subscription")
+		}
 	}
 
 	return nil

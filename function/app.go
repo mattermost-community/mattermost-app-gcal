@@ -20,9 +20,24 @@ var BuildHash string
 var BuildHashShort string
 var BuildDate string
 
-// KV store prefixes
+// KV store: subscriptions
 const (
-	SubPrefix = "s"
+	// Individual subscriptions are stored in the "s" namespace, as "[s]{id}",
+	// where id is the generated ID of the subscription, also known as channel
+	// ID in Google terms.
+	KVSubPrefix = "s"
+
+	// Indices of subscriptions are stored in the "si" namespace, as
+	// "[si]{userID}". The global (channel) subscriptions are stored under the
+	// "bot_subs".
+	KVSubIndexPrefix = "si"
+
+	// Individual events are stored in the "e" namespace, as
+	// "[e]base64({googleEmail}/{calID}/{eventID})".
+	KVEventPrefix = "e"
+
+	// The name of the key that stores the list of global subscriptions.
+	KVBotSubscriptionsKey = "bot_subs"
 )
 
 // Field names
@@ -38,6 +53,7 @@ const (
 	fJSON              = "json"
 	fMode              = "mode"
 	fState             = "state"
+	fSubscriptionID    = "sub_id"
 	fUseServiceAccount = "use_service_account"
 )
 
@@ -65,7 +81,9 @@ func Init() {
 	HandleCommand(debugUserInfo)
 	HandleCommand(disconnect)
 	HandleCommand(info)
-	HandleCommand(subscribe)
+	HandleCommand(watchList)
+	HandleCommand(watchStart)
+	HandleCommand(watchStop)
 
 	// Modals
 	HandleCall("/configure-modal/submit",
@@ -74,8 +92,10 @@ func Init() {
 		RequireAdmin(FormHandler(handleConfigureModalForm)))
 
 	// Lookups TODO rework when the paths are decoupled from forms
-	HandleCall(subscribe.Path()+"/lookup",
+	HandleCall(watchStart.Path()+"/lookup",
 		RequireGoogleAuth(handleCalendarIDLookup(nil)))
+	HandleCall(watchStop.Path()+"/lookup",
+		RequireGoogleAuth(handleSubscriptionIDLookup(nil)))
 	HandleCall(debugListEvents.Path()+"/lookup",
 		RequireGoogleAuth(handleCalendarIDLookup(nil)))
 	HandleCall(debugGetEvent.Path()+"/lookup",

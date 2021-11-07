@@ -16,7 +16,6 @@ func fieldEventID(isRequired bool, autocompletePosition int) apps.Field {
 }
 
 func handleGetEventLookup(creq CallRequest) apps.CallResponse {
-	creq.log.Debugf("<>/<> handleGetEventLookup for %q", creq.SelectedField)
 	switch creq.SelectedField {
 	case fCalendarID:
 		return handleCalendarIDLookup(nil)(creq)

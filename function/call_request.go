@@ -21,6 +21,7 @@ type CallRequest struct {
 	authOption option.ClientOption
 	ctx        context.Context
 	log        utils.Logger
+	// TODO cache mattermost (bot, user) and google clients
 }
 
 type HandlerFunc func(CallRequest) apps.CallResponse

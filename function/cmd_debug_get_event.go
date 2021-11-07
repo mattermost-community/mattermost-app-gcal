@@ -43,6 +43,7 @@ var debugGetEvent = Command{
 		}
 
 		message := fmt.Sprintf("#### %s\n", EventSummaryString(e))
+		message += fmt.Sprintf("  Time: %s\n", EventDateTimeString(e))
 		if len(e.Attendees) > 0 {
 			message += fmt.Sprintf("  Guests: %s\n", EventAttendeesString(e))
 		}

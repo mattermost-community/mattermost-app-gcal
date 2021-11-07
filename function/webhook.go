@@ -13,83 +13,94 @@ import (
 )
 
 func webhookReceived(creq CallRequest) apps.CallResponse {
+	//TODO: process webhooks async
+	err := doWebhookReceived(creq)
+	if err != nil {
+		return apps.NewErrorResponse(err)
+	}
+	return apps.NewTextResponse("OK")
+}
+
+func doWebhookReceived(creq CallRequest) error {
 	headers, ok := creq.Values["headers"].(map[string]interface{})
 	if !ok {
-		return apps.NewErrorResponse(utils.NewInvalidError(
-			"no header found in the Google webhook request"))
+		return utils.NewInvalidError("no header found in the Google webhook request")
 	}
-
-	asBot := appclient.AsBot(creq.Context)
 
 	subID, ok := headers["X-Goog-Channel-Id"].(string)
 	if !ok || subID == "" {
-		return apps.NewErrorResponse(utils.NewInvalidError(
-			"header X-Goog-Channel-Id not found in the Google webhook request"))
+		return utils.NewInvalidError("header X-Goog-Channel-Id not found in the Google webhook request")
 	}
-	s := Sub{}
-	err := asBot.KVGet(subID, SubPrefix, &s)
+	creq.log = creq.log.With("sub_id", subID)
+	s, err := creq.LoadSub(subID)
 	if err != nil && errors.Cause(err) != utils.ErrNotFound {
-		return apps.NewErrorResponse(err)
+		return err
 	}
+	creq.log = creq.log.With("google_email", s.GoogleEmail, "cal_id", s.CalendarID)
 
-	// DM (personal) webhooks should impersonate the user to access the
-	// calendar. Channel (shared) webhooks must use the unaltered service
-	// account credentials.
-	impersonate := ""
-	if s.MattermostChannelID == "" {
-		impersonate = s.GoogleEmail
-	}
-	opt, err := ServiceAccountFromRequest(creq).AuthOption(creq.ctx, impersonate)
+	opt, err := ServiceAccountFromRequest(creq).AuthOption(creq.ctx, s.GoogleEmail)
 	if err != nil {
-		return apps.NewErrorResponse(
-			errors.Wrap(err, "failed to authenticate to Google"))
+		return errors.Wrap(err, "failed to authenticate to Google")
 	}
-
 	calService, err := calendar.NewService(creq.ctx, opt)
 	if err != nil {
-		return apps.NewErrorResponse(
-			errors.Wrap(err, "failed to get Calendar client to Google"))
-	}
-	if s.SubID != subID {
-		resourceID, _ := headers["X-Goog-Resource-Id"].(string)
-		creq.CleanupOrphantSub(subID, resourceID, s)
+		return errors.Wrap(err, "failed to get Calendar client to Google")
 	}
 
 	syncToken := s.SyncToken
-	resourceState, _ := headers["X-Goog-Channel-Id"].(string)
+	resourceState, _ := headers["X-Goog-Resource-State"].(string)
 	if resourceState == "sync" {
 		syncToken = ""
 	}
+	creq.log = creq.log.With("sync_token", s.SyncToken)
+
+	//TODO: implement NextPageToken support
 	events, err := calService.Events.List(s.CalendarID).SyncToken(syncToken).Do()
 	if err != nil {
-		return apps.NewErrorResponse(
-			errors.Wrap(err, "failed to list events"))
+		return errors.Wrap(err, "failed to list events")
 	}
 
-	postf := func(p model.Post) {
-		asBot.DMPost(s.MattermostUserID, &p)
-	}
-	if s.MattermostChannelID != "" {
-		postf = func(p model.Post) {
-			p.ChannelId = s.MattermostChannelID
-			asBot.CreatePost(&p)
+	asBot := appclient.AsBot(creq.Context)
+	for _, e := range events.Items {
+		problems := []error{}
+		prev, err := creq.LoadEvent(s.GoogleEmail, s.CalendarID, e.Id)
+		if err != nil && errors.Cause(err) != utils.ErrNotFound {
+			problems = append(problems, err)
+		}
+
+		message := EventDiffString(prev, e)
+
+		if len(problems) > 0 {
+			message += "\n----\n"
+			message += fmt.Sprintf("Errors: %v", problems)
+		}
+
+		rootPostID := ""
+		if prev != nil {
+			rootPostID = prev.RootPostID
+		}
+		post, _ := asBot.DMPost(s.MattermostUserID, &model.Post{
+			Message: message,
+			RootId:  rootPostID,
+		})
+		if rootPostID == "" && post != nil {
+			rootPostID = post.Id
+		}
+		err = creq.StoreEvent(s.GoogleEmail, s.CalendarID, &Event{
+			Event:      e,
+			RootPostID: rootPostID,
+		})
+		if err != nil {
+			problems = append(problems, err)
 		}
 	}
 
-	// Post the results.
-	postf(model.Post{
-		Message: fmt.Sprintf("received notification: %s", utils.JSONBlock(headers)),
-	})
-	postf(model.Post{
-		Message: fmt.Sprintf("events: %s", utils.JSONBlock(events)),
-	})
-
 	// Update the sync token in the subscription.
 	s.SyncToken = events.NextSyncToken
-	err = creq.StoreSub(s)
+	err = creq.StoreSub(*s, false)
 	if err != nil {
-		return apps.NewErrorResponse(errors.Wrap(err, "failed to update sync token in subscription"))
+		return errors.Wrap(err, "failed to update sync token in subscription")
 	}
 
-	return apps.NewTextResponse("OK")
+	return nil
 }

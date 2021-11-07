@@ -54,6 +54,7 @@ var debugListEvents = Command{
 		message := "#### List of Google Calendar events."
 		for _, item := range events.Items {
 			message += fmt.Sprintf("- %s\n", EventSummaryString(item))
+			message += fmt.Sprintf("  Time: %s\n", EventDateTimeString(item))
 			if len(item.Attendees) > 0 {
 				message += fmt.Sprintf("  Guests: %s\n", EventAttendeesString(item))
 			}

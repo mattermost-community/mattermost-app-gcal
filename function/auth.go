@@ -34,7 +34,7 @@ func oauth2Config(creq CallRequest) *oauth2.Config {
 
 func oauth2Connect(creq CallRequest) apps.CallResponse {
 	state := creq.GetValue(fState, "")
-	url := oauth2Config(creq).AuthCodeURL(state, oauth2.AccessTypeOffline, oauth2.ApprovalForce)
+	url := oauth2Config(creq).AuthCodeURL(state, oauth2.AccessTypeOffline)
 	return apps.NewDataResponse(url)
 }
 

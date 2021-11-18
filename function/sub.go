@@ -66,7 +66,7 @@ func (creq CallRequest) StoreSub(s *Sub, updateIndex bool) error {
 		return nil
 	}
 
-	var subIDs map[string]interface{}
+	var subIDs map[string]struct{}
 	err = asBot.KVGet(s.CreatorID, KVSubIndexPrefix, &subIDs)
 	if err != nil {
 		return errors.Wrap(err, "failed to load prior list of subscriptions")

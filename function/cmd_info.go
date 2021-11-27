@@ -10,16 +10,12 @@ var info = Command{
 	Name:        "info",
 	Description: "Google Calendar App information",
 
-	BaseSubmit: apps.Call{
+	BaseSubmit: &apps.Call{
 		Expand: &apps.Expand{
 			ActingUser: apps.ExpandSummary,
 			OAuth2App:  apps.ExpandAll,
 			OAuth2User: apps.ExpandAll,
 		},
-	},
-
-	BaseForm: apps.Form{
-		Title: "Google Calendar App information",
 	},
 
 	Handler: RequireAdmin(func(creq CallRequest) apps.CallResponse {

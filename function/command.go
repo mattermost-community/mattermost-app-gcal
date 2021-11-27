@@ -10,10 +10,8 @@ type Command struct {
 	Name        string
 	Hint        string
 	Description string
-
-	BaseSubmit  apps.Call
-	BaseForm    apps.Form
-	BaseBinding apps.Binding
+	BaseSubmit  *apps.Call
+	BaseForm    *apps.Form
 
 	Handler func(CallRequest) apps.CallResponse
 }
@@ -23,6 +21,9 @@ func (c Command) Path() string {
 }
 
 func (c Command) Submit(creq CallRequest) *apps.Call {
+	if c.BaseSubmit == nil {
+		return nil
+	}
 	s := *c.BaseSubmit.PartialCopy()
 	if s.Path == "" {
 		s.Path = c.Path()
@@ -31,14 +32,17 @@ func (c Command) Submit(creq CallRequest) *apps.Call {
 }
 
 func (c Command) Form(creq CallRequest) *apps.Form {
+	if c.BaseForm == nil {
+		return nil
+	}
 	f := *c.BaseForm.PartialCopy()
 	if f.Icon == "" {
 		f.Icon = IconPath
 	}
-	if f.Call == nil {
-		f.Call = c.Submit(creq)
-	} else if f.Call.Path == "" {
-		f.Call.Path = c.Path()
+	if f.Submit == nil {
+		f.Submit = c.Submit(creq)
+	} else if f.Submit.Path == "" {
+		f.Submit.Path = c.Path()
 	}
 
 	f.Fields = appendDebugFields(f.Fields, creq)
@@ -58,12 +62,12 @@ func (c Command) Binding(creq CallRequest) apps.Binding {
 	b := apps.Binding{
 		Location:    apps.Location(c.Name),
 		Icon:        IconPath,
+		// TODO: ticket plugin-apps should do this.
 		Label:       strings.ReplaceAll(c.Name, "_", "-"),
 		Hint:        c.Hint,
 		Description: c.Description,
-		Call:        c.Submit(creq),
+		Submit:      c.Submit(creq),
 		Form:        c.Form(creq),
 	}
-
 	return b
 }

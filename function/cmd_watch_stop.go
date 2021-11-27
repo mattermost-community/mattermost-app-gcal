@@ -14,16 +14,15 @@ var watchStop = Command{
 	Name:        "stop",
 	Description: "Stop a personal subscription to Google Calendar change notifications",
 
-	BaseSubmit: apps.Call{
-		Expand: &apps.Expand{
-			OAuth2User: apps.ExpandAll,
-			OAuth2App:  apps.ExpandAll,
-		},
-	},
-
-	BaseForm: apps.Form{
+	BaseForm: &apps.Form{
 		Fields: []apps.Field{
 			fieldSubscriptionID(true, 1),
+		},
+		Submit: &apps.Call{
+			Expand: &apps.Expand{
+				OAuth2User: apps.ExpandAll,
+				OAuth2App:  apps.ExpandAll,
+			},
 		},
 	},
 

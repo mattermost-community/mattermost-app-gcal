@@ -13,14 +13,14 @@ var debugGetEvent = Command{
 	Name:        "get-event",
 	Description: "Get a specific event from a Google Calendar",
 
-	BaseSubmit: apps.Call{
-		Expand: &apps.Expand{
-			OAuth2User: apps.ExpandAll,
-			OAuth2App:  apps.ExpandAll,
+	BaseForm: &apps.Form{
+		Title:"debug get event",
+		Submit: &apps.Call{
+			Expand: &apps.Expand{
+				OAuth2User: apps.ExpandAll,
+				OAuth2App:  apps.ExpandAll,
+			},
 		},
-	},
-
-	BaseForm: apps.Form{
 		Fields: []apps.Field{
 			fieldCalendarID(true, 1),
 			fieldEventID(true, 2),

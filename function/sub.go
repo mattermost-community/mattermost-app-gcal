@@ -72,7 +72,7 @@ func (creq CallRequest) StoreSub(s *Sub, updateIndex bool) error {
 		return errors.Wrap(err, "failed to load prior list of subscriptions")
 	}
 	if subIDs == nil {
-		subIDs = map[string]interface{}{}
+		subIDs = map[string]struct{}{}
 	}
 	if _, ok := subIDs[s.SubID]; ok {
 		// nothing more to do

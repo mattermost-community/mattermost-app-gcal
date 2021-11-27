@@ -11,14 +11,8 @@ var debugStopWatch = Command{
 	Name:        "stop-watch",
 	Description: "Stop Google watch with the internal IDs",
 
-	BaseSubmit: apps.Call{
-		Expand: &apps.Expand{
-			OAuth2User: apps.ExpandAll,
-			OAuth2App:  apps.ExpandAll,
-		},
-	},
-
-	BaseForm: apps.Form{
+	BaseForm: &apps.Form{
+		Title: "debug stop watch",
 		Fields: []apps.Field{
 			{
 				Name:        fID,
@@ -31,6 +25,12 @@ var debugStopWatch = Command{
 				Type:        apps.FieldTypeText,
 				Description: "Google resource ID (see Channel)",
 				IsRequired:  true,
+			},
+		},
+		Submit: &apps.Call{
+			Expand: &apps.Expand{
+				OAuth2User: apps.ExpandAll,
+				OAuth2App:  apps.ExpandAll,
 			},
 		},
 	},

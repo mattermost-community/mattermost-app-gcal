@@ -50,7 +50,7 @@ func HandleCall(p string, h HandlerFunc) {
 }
 
 func HandleCommand(command Command) {
-	HandleCall(command.Path()+"/submit", command.Handler)
+	HandleCall(command.Path(), command.Handler)
 }
 
 func RequireAdmin(h HandlerFunc) HandlerFunc {

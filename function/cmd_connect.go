@@ -9,7 +9,7 @@ import (
 
 var connect = Command{
 	Name: "connect",
-	BaseSubmit: apps.Call{
+	BaseSubmit: &apps.Call{
 		Expand: &apps.Expand{
 			OAuth2App: apps.ExpandAll,
 		},
@@ -23,7 +23,7 @@ var connect = Command{
 var disconnect = Command{
 	Name: "disconnect",
 
-	BaseSubmit: apps.Call{
+	BaseSubmit: &apps.Call{
 		Expand: &apps.Expand{
 			ActingUserAccessToken: apps.ExpandAll,
 		},

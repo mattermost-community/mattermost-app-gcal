@@ -13,7 +13,7 @@ var debugListCalendars = Command{
 	Name:        "list-calendars",
 	Description: "List Google Calendars",
 
-	BaseSubmit: apps.Call{
+	BaseSubmit: &apps.Call{
 		Expand: &apps.Expand{
 			OAuth2User: apps.ExpandAll,
 			OAuth2App:  apps.ExpandAll,

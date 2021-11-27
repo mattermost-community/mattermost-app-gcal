@@ -13,7 +13,7 @@ var debugUserInfo = Command{
 	Name:        "user-info",
 	Description: "Obtains user info from Google Calendar",
 
-	BaseSubmit: apps.Call{
+	BaseSubmit: &apps.Call{
 		Expand: &apps.Expand{
 			OAuth2User: apps.ExpandAll,
 			OAuth2App:  apps.ExpandAll,

@@ -60,21 +60,21 @@ const (
 )
 
 func Init() {
-	// Ping
+	// Ping.
 	http.HandleFunc(AppPathPrefix+"/ping",
-		httputils.HandleJSONData([]byte("{}")))
+		httputils.HandleStaticJSONData([]byte("{}")))
 
-	// Bindings
+	// Bindings.
 	HandleCall("/bindings", bindings)
 
 	// OAuth2 (Google Calendar) connect commands and callbacks.
 	HandleCall("/oauth2/connect", oauth2Connect)
 	HandleCall("/oauth2/complete", oauth2Complete)
 
-	// Google Calendar webhook handler
+	// Google Calendar webhook handler.
 	HandleCall(appspath.Webhook, webhookReceived)
 
-	// Commands
+	// Command submit handlers.
 	HandleCommand(configure)
 	HandleCommand(connect)
 	HandleCommand(debugGetEvent)
@@ -88,22 +88,21 @@ func Init() {
 	HandleCommand(watchStart)
 	HandleCommand(watchStop)
 
-	// Modals
-	HandleCall("/configure-modal/submit",
-		RequireAdmin(handleConfigureModal))
-	HandleCall("/configure-modal/form",
-		RequireAdmin(FormHandler(handleConfigureModalForm)))
+	// Configure modal (submit+source).
+	HandleCall("/configure-modal", RequireAdmin(
+		configureModal))
+	HandleCall("/f/configure-modal", RequireAdmin(
+		FormHandler(configureModalForm)))
 
-	// Lookups TODO rework when the paths are decoupled from forms
-	HandleCall(watchStart.Path()+"/lookup",
-		RequireGoogleAuth(handleCalendarIDLookup(nil)))
-	HandleCall(watchStop.Path()+"/lookup",
-		RequireGoogleAuth(handleSubscriptionIDLookup(nil)))
-	HandleCall(debugListEvents.Path()+"/lookup",
-		RequireGoogleAuth(handleCalendarIDLookup(nil)))
-	HandleCall(debugGetEvent.Path()+"/lookup",
-		RequireGoogleAuth(handleGetEventLookup))
+	// Lookups TODO rework when the paths are decoupled from forms.
+	HandleCall("/q/cal", RequireGoogleAuth(
+		LookupHandler(calendarIDLookup)))
+	HandleCall("/q/event", RequireGoogleAuth(
+		LookupHandler(eventLookup)))
+	HandleCall("/q/sub", RequireGoogleAuth(
+		LookupHandler(subscriptionIDLookup)))
 
+	// Log NOT FOUND.
 	http.HandleFunc("/", func(w http.ResponseWriter, req *http.Request) {
 		Log.Warnw("not found", "path", req.URL.Path, "method", req.Method)
 		http.Error(w, fmt.Sprintf("Not found: %s %q", req.Method, req.URL.Path), http.StatusNotFound)

@@ -17,18 +17,18 @@ var watchStart = Command{
 	Name:        "start",
 	Description: "Start a personal subscription to Google Calendar change notifications",
 
-	BaseSubmit: apps.Call{
-		Expand: &apps.Expand{
-			App:                   apps.ExpandSummary,
-			ActingUserAccessToken: apps.ExpandAll,
-			OAuth2User:            apps.ExpandAll,
-			OAuth2App:             apps.ExpandAll,
-		},
-	},
-
-	BaseForm: apps.Form{
+	BaseForm: &apps.Form{
+		Title: "start watch",
 		Fields: []apps.Field{
 			fieldCalendarID(true, 1),
+		},
+		Submit: &apps.Call{
+			Expand: &apps.Expand{
+				App:                   apps.ExpandSummary,
+				ActingUserAccessToken: apps.ExpandAll,
+				OAuth2User:            apps.ExpandAll,
+				OAuth2App:             apps.ExpandAll,
+			},
 		},
 	},
 

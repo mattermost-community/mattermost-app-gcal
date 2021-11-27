@@ -13,19 +13,16 @@ var debugListEvents = Command{
 	Name:        "list-events",
 	Description: "List events in a Google Calendar",
 
-	BaseSubmit: apps.Call{
-		Expand: &apps.Expand{
-			OAuth2User: apps.ExpandAll,
-			OAuth2App:  apps.ExpandAll,
-		},
-	},
-
-	BaseForm: apps.Form{
-		Title: "Test Google Cal",
+	BaseForm: &apps.Form{
+		Title: "debug list events",
 		Fields: []apps.Field{
 			fieldCalendarID(true, 1),
-			fieldDebugUseServiceAccount,
-			fieldDebugImpersonateEmail,
+		},
+		Submit: &apps.Call{
+			Expand: &apps.Expand{
+				OAuth2User: apps.ExpandAll,
+				OAuth2App:  apps.ExpandAll,
+			},
 		},
 	},
 

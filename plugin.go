@@ -30,7 +30,7 @@ func init() {
 
 func InitHTTP(prefix string) {
 	http.HandleFunc(prefix+"/manifest.json",
-		httputils.HandleJSONData(AppManifestData))
+		httputils.HandleStaticJSONData(AppManifestData))
 
 	http.Handle(prefix+"/static/",
 		http.StripPrefix(prefix+"/", http.FileServer(http.FS(StaticFS))))

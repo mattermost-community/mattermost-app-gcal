@@ -12,7 +12,7 @@ func fieldEventID(isRequired bool, autocompletePosition int) apps.Field {
 		Description:          "Choose an Event",
 		IsRequired:           isRequired,
 		AutocompletePosition: autocompletePosition,
-		SelectLookup: &apps.Call{
+		SelectDynamicLookup: &apps.Call{
 			Path: "/q/event",
 			Expand: &apps.Expand{
 				OAuth2User: apps.ExpandAll,

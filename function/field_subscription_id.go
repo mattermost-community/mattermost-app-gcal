@@ -11,7 +11,7 @@ func fieldSubscriptionID(isRequired bool, autocompletePosition int) apps.Field {
 		Description:          "Choose a personal subscription to a Google Calendar",
 		IsRequired:           isRequired,
 		AutocompletePosition: autocompletePosition,
-		SelectLookup:         apps.NewCall("/q/sub"),
+		SelectDynamicLookup:  apps.NewCall("/q/sub"),
 	}
 }
 

@@ -9,7 +9,7 @@ import (
 
 	"sigs.k8s.io/yaml"
 
-	"github.com/mattermost/mattermost-plugin-starter-template/build/sync/plan"
+	"github.com/mattermost/mattermost-app-gcal/build/sync/plan"
 )
 
 func main() {

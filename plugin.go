@@ -13,26 +13,24 @@ import (
 //go:embed plugin.json
 var pluginManifestData []byte
 
-//nolint:golint
 //go:embed manifest.json
-var AppManifestData []byte
+var appManifestData []byte
 
-//nolint:golint
 //go:embed static
-var StaticFS embed.FS
+var staticFS embed.FS
 
 var Manifest model.Manifest
 var AppManifest apps.Manifest
 
 func init() {
 	_ = json.Unmarshal(pluginManifestData, &Manifest)
-	_ = json.Unmarshal(AppManifestData, &AppManifest)
+	_ = json.Unmarshal(appManifestData, &AppManifest)
 }
 
 func InitHTTP(prefix string) {
 	http.HandleFunc(prefix+"/manifest.json",
-		httputils.HandleStaticJSONData(AppManifestData))
+		httputils.HandleStaticJSONData(appManifestData))
 
 	http.Handle(prefix+"/static/",
-		http.StripPrefix(prefix+"/", http.FileServer(http.FS(StaticFS))))
+		http.StripPrefix(prefix+"/", http.FileServer(http.FS(staticFS))))
 }

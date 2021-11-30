@@ -91,13 +91,13 @@ func EventAttendeesString(e *calendar.Event) string {
 
 func EventDiffString(before *Event, after *calendar.Event, calSummary string) string {
 	if after.Id == "" {
-		return fmt.Sprintf("error: empty ID")
+		return "error: empty ID"
 	}
 	if before != nil && before.Event.Id != "" && before.Event.Id != after.Id {
 		return fmt.Sprintf("ID mismatch: before %q, after %q", before.Event.Id, after.Id)
 	}
-	if after.Status == "cancelled" && before != nil {
-		return fmt.Sprintf("**Cancelled**: %s", EventSummaryString(before.Event))
+	if after.Status == "canceled" && before != nil {
+		return fmt.Sprintf("**Canceled**: %s", EventSummaryString(before.Event))
 	}
 
 	s := ""

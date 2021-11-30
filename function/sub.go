@@ -15,7 +15,7 @@ type Sub struct {
 	// CreatorID is the Mattermost ID of the user who created the subscription.
 	// It is used to namespace the cached events for the user as they are stored
 	// by the webhook handler.
-	CreatorID string `json:"creator_id",omitempty`
+	CreatorID string `json:"creator_id,omitempty"`
 
 	// GoogleEmail is the email ID of the Google user, used for impersonation
 	// with a service account.

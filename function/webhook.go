@@ -58,7 +58,8 @@ func doWebhookReceived(creq CallRequest) error {
 	asBot := appclient.AsBot(creq.Context)
 	for _, e := range events.Items {
 		problems := []error{}
-		prev, err := creq.LoadEvent(s.GoogleEmail, s.CalendarID, e.Id)
+		var prev *Event
+		prev, err = creq.LoadEvent(s.GoogleEmail, s.CalendarID, e.Id)
 		if err != nil && errors.Cause(err) != utils.ErrNotFound {
 			problems = append(problems, err)
 		}
@@ -86,13 +87,10 @@ func doWebhookReceived(creq CallRequest) error {
 			}
 		}
 
-		err = creq.StoreEvent(s.GoogleEmail, s.CalendarID, &Event{
+		_ = creq.StoreEvent(s.GoogleEmail, s.CalendarID, &Event{
 			Event:      e,
 			RootPostID: rootPostID,
 		})
-		if err != nil {
-			problems = append(problems, err)
-		}
 	}
 
 	// Update the sync token in the subscription.

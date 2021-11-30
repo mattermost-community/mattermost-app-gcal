@@ -60,8 +60,8 @@ func (c Command) Form(creq CallRequest) *apps.Form {
 
 func (c Command) Binding(creq CallRequest) apps.Binding {
 	b := apps.Binding{
-		Location:    apps.Location(c.Name),
-		Icon:        IconPath,
+		Location: apps.Location(c.Name),
+		Icon:     IconPath,
 		// TODO: ticket plugin-apps should do this.
 		Label:       strings.ReplaceAll(c.Name, "_", "-"),
 		Hint:        c.Hint,

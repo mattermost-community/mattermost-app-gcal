@@ -67,7 +67,7 @@ var watchStart = Command{
 			}
 			channel, err := calService.Events.Watch(calID, channelIn).Do()
 			if err != nil {
-				return apps.NewErrorResponse(errors.Wrapf(err, "failed to watch %s"))
+				return apps.NewErrorResponse(errors.Wrap(err, "failed to watch"))
 			}
 			creq.log.Debugf("started watching:\n%s\nresponse: %s", utils.Pretty(channelIn), utils.Pretty(channel))
 
@@ -84,7 +84,7 @@ var watchStart = Command{
 		}),
 }
 
-func canWatchToChannel(creq CallRequest) bool {
+func canWatchToChannel(creq CallRequest) bool { //nolint:deadcode,unused
 	cc := creq.Context
 	switch {
 	case cc.ActingUser != nil && cc.ActingUser.IsSystemAdmin():

@@ -1,8 +1,7 @@
 package root
 
 import (
-	"embed"
-	_ "embed" // Need to embed manifest file
+	"embed" // Need to embed manifest file
 	"encoding/json"
 	"net/http"
 
@@ -14,9 +13,11 @@ import (
 //go:embed plugin.json
 var pluginManifestData []byte
 
+//nolint:golint
 //go:embed manifest.json
 var AppManifestData []byte
 
+//nolint:golint
 //go:embed static
 var StaticFS embed.FS
 

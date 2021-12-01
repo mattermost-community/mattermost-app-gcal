@@ -45,7 +45,6 @@ const (
 	fAccountJSON       = "account_json"
 	fAPIKey            = "api_key"
 	fCalendarID        = "calendar_id"
-	fChannel           = "channel"
 	fClientID          = "client_id"
 	fClientSecret      = "client_secret"
 	fEventID           = "event_id"

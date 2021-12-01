@@ -136,7 +136,7 @@ func doHandleCall(w http.ResponseWriter, req *http.Request, h HandlerFunc) {
 
 func remarshal(dst, src interface{}) {
 	data, _ := json.Marshal(src)
-	json.Unmarshal(data, dst)
+	_ = json.Unmarshal(data, dst)
 }
 
 func (creq CallRequest) appProxyURL(paths ...string) string {

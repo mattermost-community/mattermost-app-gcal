@@ -12,7 +12,7 @@ func fieldCalendarID(isRequired bool, autocompletePosition int) apps.Field {
 		Description:          "Choose a Google Calendar",
 		IsRequired:           isRequired,
 		AutocompletePosition: autocompletePosition,
-		SelectLookup: &apps.Call{
+		SelectDynamicLookup: &apps.Call{
 			Path: "/q/cal",
 			Expand: &apps.Expand{
 				OAuth2App:  apps.ExpandAll,

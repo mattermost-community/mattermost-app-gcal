@@ -108,7 +108,7 @@ func configureModalForm(creq CallRequest) (apps.Form, error) {
 		SelectRefresh: true,
 	}
 	for v, l := range serviceAccountModes {
-		field.SelectOptions = append(field.SelectOptions, apps.SelectOption{
+		field.SelectStaticOptions = append(field.SelectStaticOptions, apps.SelectOption{
 			Label: l,
 			Value: v,
 		})

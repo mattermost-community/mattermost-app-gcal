@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"net/http"
+	"time"
 
 	root "github.com/mattermost/mattermost-app-gcal"
 	function "github.com/mattermost/mattermost-app-gcal/function"
@@ -14,6 +15,13 @@ func main() {
 	function.AppPathPrefix = ""
 	function.Init()
 
-	fmt.Println("gcal App started, manifest at http://localhost:4444/manifest.json")
-	panic(http.ListenAndServe(":4444", nil))
+	listen := ":4444"
+	server := &http.Server{
+		Addr:              listen,
+		ReadHeaderTimeout: 3 * time.Second,
+		WriteTimeout:      5 * time.Second,
+	}
+
+	fmt.Printf("gcal App started, manifest at http://localhost%s/manifest.json\n", listen)
+	panic(server.ListenAndServe())
 }

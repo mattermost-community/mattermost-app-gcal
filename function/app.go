@@ -61,7 +61,7 @@ const (
 func Init() {
 	// Ping.
 	http.HandleFunc(AppPathPrefix+"/ping",
-		httputils.HandleStaticJSONData([]byte("{}")))
+		httputils.DoHandleJSONData([]byte("{}")))
 
 	// Bindings.
 	HandleCall("/bindings", bindings)

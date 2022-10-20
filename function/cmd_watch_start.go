@@ -43,8 +43,8 @@ var watchStart = Command{
 			s := Sub{
 				SubID:            model.NewId(),
 				CalendarID:       calID,
-				CreatorID:        creq.Context.ActingUserID,
-				MattermostUserID: creq.Context.ActingUserID,
+				CreatorID:        creq.Context.ActingUser.Id,
+				MattermostUserID: creq.Context.ActingUser.Id,
 				GoogleEmail:      creq.user.Email,
 			}
 

@@ -16,7 +16,7 @@ func configureModal(creq CallRequest) apps.CallResponse {
 
 	asActingUser := appclient.AsActingUser(creq.Context)
 	sa := NewServiceAccount(mode, apiKey, serviceAccount)
-	err := asActingUser.StoreOAuth2App(creq.Context.AppID, apps.OAuth2App{
+	err := asActingUser.StoreOAuth2App(apps.OAuth2App{
 		ClientID:     clientID,
 		ClientSecret: clientSecret,
 		Data:         sa,

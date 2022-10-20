@@ -11,7 +11,7 @@ var watchList = Command{
 	Description: "List personal subscriptions to Google Calendar change notifications",
 
 	Handler: func(creq CallRequest) apps.CallResponse {
-		subs, err := creq.ListSubs(creq.Context.ActingUserID)
+		subs, err := creq.ListSubs(creq.Context.ActingUser.Id)
 		if err != nil {
 			return apps.NewErrorResponse(err)
 		}

@@ -18,7 +18,7 @@ func fieldSubscriptionID(isRequired bool, autocompletePosition int) apps.Field {
 func subscriptionIDLookup(creq CallRequest) []apps.SelectOption {
 	opts := []apps.SelectOption{}
 
-	owner := creq.Context.ActingUserID
+	owner := creq.Context.ActingUser.Id
 	subs, err := creq.ListSubs(owner)
 	if err != nil {
 		creq.log.WithError(err).Warnf("failed to get list of subscriptions.")

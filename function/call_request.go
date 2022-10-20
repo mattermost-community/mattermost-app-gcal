@@ -79,7 +79,7 @@ func RequireGoogleAuth(h HandlerFunc) HandlerFunc {
 			newToken, err := ts.Token()
 			if err == nil && newToken.AccessToken != token.AccessToken {
 				creq.user.Token = newToken
-				_ = appclient.AsActingUser(creq.Context).StoreOAuth2User(creq.Context.AppID, creq.user)
+				_ = appclient.AsActingUser(creq.Context).StoreOAuth2User(creq.user)
 			}
 
 			creq.authOption = option.WithTokenSource(ts)

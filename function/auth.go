@@ -59,7 +59,7 @@ func oauth2Complete(creq CallRequest) apps.CallResponse {
 	}
 
 	asActingUser := appclient.AsActingUser(creq.Context)
-	err = asActingUser.StoreOAuth2User(creq.Context.AppID, User{
+	err = asActingUser.StoreOAuth2User(User{
 		Token: token,
 		Email: ui.Email,
 		ID:    ui.Id,

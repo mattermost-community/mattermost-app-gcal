@@ -63,7 +63,7 @@ func configureModalForm(creq CallRequest) (apps.Form, error) {
 		Title: "Configure Google Calendar App credentials",
 		Header: "" +
 			"- Client ID and Secret are needed for the Mattermost users to authenticate to Google. " +
-			"  [documentation](https://developers.google.com/identity/gsi/web/guides/get-google-api-clientid)" +
+			"  [documentation](https://developers.google.com/workspace/guides/create-credentials#oauth-client-id)" +
 			"\n" +
 			"- Service Account is needed for to process incoming webhooks from Google. " +
 			"  [documentation](https://cloud.google.com/iam/docs/creating-managing-service-accounts)" +

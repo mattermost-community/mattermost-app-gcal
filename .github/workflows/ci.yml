@@ -1,18 +1,14 @@
 name: ci
 on:
-  schedule:
-    - cron: "0 0 * * *"
+  pull_request:
   push:
     branches:
       - master
+      - main
     tags:
       - "^v.*"
-  pull_request:
-
-permissions:
-  contents: read
 
 jobs:
   plugin-ci:
-    uses: mattermost/actions-workflows/.github/workflows/plugin-ci.yml@main
+    uses: mattermost/actions-workflows/.github/workflows/community-plugin-ci.yml@main
     secrets: inherit
